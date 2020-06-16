@@ -1,28 +1,12 @@
-#[cfg(feature = "fp_double_precision")]
-mod rtow_types {
-    pub type Real = f64;
-    pub const C_255_999: Real = 255.999f64;
-}
+mod hittable;
+mod hittable_list;
+mod sphere;
+mod types;
 
-#[cfg(not(feature = "fp_double_precision"))]
-mod rtow_types {
-    pub type Real = f32;
-    pub const C_255_999: Real = 255.999f32;
-}
-
-pub use rtow_types::*;
-type Vec3 = math::vec3::TVec3<Real>;
-type Color = Vec3;
-type Point = Vec3;
-type Ray = math::ray::TRay<Real>;
-
-fn ray_color(r: &Ray) -> Color {
-    use math::vec3::normalize;
-    let unit_direction = normalize(r.direction);
-    let t = 0.5f32 * (unit_direction.y + 1.0);
-
-    (1f32 - t) * Color::same(1f32) + t * Color::new(0.5f32, 0.7f32, 1f32)
-}
+use hittable::{HitRecord, Hittable};
+use hittable_list::HittableList;
+use sphere::Sphere;
+use types::*;
 
 fn write_pixel(w: &mut impl std::io::Write, color: Color) -> std::io::Result<()> {
     writeln!(
@@ -51,16 +35,40 @@ fn write_ppm<P: AsRef<std::path::Path>>(
 
     (0..height).rev().for_each(|y| {
         (0..width).for_each(|x| {
-            // let pixel_color = Color::new(
-            //     x as f32 / (width - 1) as f32,
-            //     y as f32 / (height - 1) as f32,
-            //     0.25f32,
-            // );
             write_pixel(&mut w, pixels[(y * width + x) as usize]).expect("Failed to write image!");
         });
     });
 
     Ok(())
+}
+
+fn hit_sphere(center: Point, radius: Real, ray: &Ray) -> f32 {
+    use math::vec3::dot;
+
+    let oc = ray.origin - center;
+    let a = ray.direction.length_squared();
+    let half_b = dot(oc, ray.direction);
+    // let b = 2f32 * dot(oc, ray.direction);
+    let c = oc.length_squared() - radius * radius;
+
+    let delta = half_b * half_b - a * c;
+    if delta < 0f32 {
+        -1f32
+    } else {
+        (-half_b - delta.sqrt()) / a
+    }
+}
+
+fn ray_color(r: &Ray, world: &HittableList) -> Color {
+    if let Some(rec) = world.hit(r, 0f32, C_INFINITY) {
+        return 0.5f32 * (rec.normal + Color::same(1f32));
+    }
+
+    use math::vec3::normalize;
+    let unit_direction = normalize(r.direction);
+    let t = 0.5f32 * (unit_direction.y + 1.0);
+
+    (1f32 - t) * Color::same(1f32) + t * Color::new(0.5f32, 0.7f32, 1f32)
 }
 
 fn main() -> std::result::Result<(), String> {
@@ -79,6 +87,16 @@ fn main() -> std::result::Result<(), String> {
 
     let mut pixels = vec![Color::same(0f32); (IMAGE_WIDTH * IMAGE_HEIGHT) as usize];
 
+    use std::iter::FromIterator;
+    use std::rc::Rc;
+
+    let world_objects: Vec<Rc<dyn Hittable>> = vec![
+        Rc::new(Sphere::new(Point::new(0f32, 0f32, -1f32), 0.5f32)),
+        Rc::new(Sphere::new(Point::new(0f32, -100.5f32, -1f32), 100f32)),
+    ];
+
+    let world = HittableList::from_iter(world_objects);
+
     (0..IMAGE_HEIGHT).rev().for_each(|y| {
         (0..IMAGE_WIDTH).for_each(|x| {
             let u = x as f32 / (IMAGE_WIDTH - 1) as f32;
@@ -88,7 +106,7 @@ fn main() -> std::result::Result<(), String> {
                 origin,
                 lower_left_corner + u * horizontal + v * vertical - origin,
             );
-            pixels[(y * IMAGE_WIDTH + x) as usize] = ray_color(&ray);
+            pixels[(y * IMAGE_WIDTH + x) as usize] = ray_color(&ray, &world);
         });
     });
 
