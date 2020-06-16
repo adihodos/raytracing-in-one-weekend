@@ -1,3 +1,4 @@
+mod camera;
 mod hittable;
 mod hittable_list;
 mod sphere;
@@ -8,13 +9,19 @@ use hittable_list::HittableList;
 use sphere::Sphere;
 use types::*;
 
-fn write_pixel(w: &mut impl std::io::Write, color: Color) -> std::io::Result<()> {
+fn write_pixel(
+    w: &mut impl std::io::Write,
+    color: Color,
+    samples_per_pixel: i32,
+) -> std::io::Result<()> {
+    let (r, g, b) = (color * (1f32 / samples_per_pixel as f32)).into();
+
     writeln!(
         w,
         "{} {} {}",
-        (C_255_999 * color.x) as i32,
-        (C_255_999 * color.y) as i32,
-        (C_255_999 * color.z) as i32
+        (C_256 * clamp(r, 0f32, 0.999f32)) as i32,
+        (C_256 * clamp(g, 0f32, 0.999f32)) as i32,
+        (C_256 * clamp(b, 0f32, 0.999f32)) as i32
     )
 }
 
@@ -22,6 +29,7 @@ fn write_ppm<P: AsRef<std::path::Path>>(
     file_path: P,
     width: u32,
     height: u32,
+    samples_per_pixel: i32,
     pixels: &[Color],
 ) -> std::io::Result<()> {
     use std::fs::File;
@@ -35,7 +43,8 @@ fn write_ppm<P: AsRef<std::path::Path>>(
 
     (0..height).rev().for_each(|y| {
         (0..width).for_each(|x| {
-            write_pixel(&mut w, pixels[(y * width + x) as usize]).expect("Failed to write image!");
+            write_pixel(&mut w, pixels[(y * width + x) as usize], samples_per_pixel)
+                .expect("Failed to write image!");
         });
     });
 
@@ -75,15 +84,7 @@ fn main() -> std::result::Result<(), String> {
     const ASPECT_RATIO: Real = 16f32 / 9f32;
     const IMAGE_WIDTH: i32 = 384;
     const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
-    const VIEWPORT_HEIGHT: Real = 2f32;
-    const VIEWPORT_WIDTH: Real = VIEWPORT_HEIGHT * ASPECT_RATIO;
-    const FOCAL_LENGTH: Real = 1f32;
-
-    let origin = Vec3::same(0f32);
-    let horizontal = Vec3::new(VIEWPORT_WIDTH, 0f32, 0f32);
-    let vertical = Vec3::new(0f32, VIEWPORT_HEIGHT, 0f32);
-    let lower_left_corner =
-        origin - horizontal / 2f32 - vertical / 2f32 - Vec3::new(0f32, 0f32, FOCAL_LENGTH);
+    const SAMPLES_PER_PIXEL: i32 = 100;
 
     let mut pixels = vec![Color::same(0f32); (IMAGE_WIDTH * IMAGE_HEIGHT) as usize];
 
@@ -96,17 +97,18 @@ fn main() -> std::result::Result<(), String> {
     ];
 
     let world = HittableList::from_iter(world_objects);
+    let cam = camera::Camera::new();
 
     (0..IMAGE_HEIGHT).rev().for_each(|y| {
         (0..IMAGE_WIDTH).for_each(|x| {
-            let u = x as f32 / (IMAGE_WIDTH - 1) as f32;
-            let v = y as f32 / (IMAGE_HEIGHT - 1) as f32;
+            let pixel_color = (0..SAMPLES_PER_PIXEL).fold(Color::same(0f32), |color, _| {
+                let u = (x as Real + random_real()) / (IMAGE_WIDTH - 1) as f32;
+                let v = (y as Real + random_real()) / (IMAGE_HEIGHT - 1) as f32;
+                let r = cam.get_ray(u, v);
+                color + ray_color(&r, &world)
+            });
 
-            let ray = Ray::new(
-                origin,
-                lower_left_corner + u * horizontal + v * vertical - origin,
-            );
-            pixels[(y * IMAGE_WIDTH + x) as usize] = ray_color(&ray, &world);
+            pixels[(y * IMAGE_WIDTH + x) as usize] = pixel_color;
         });
     });
 
@@ -114,6 +116,7 @@ fn main() -> std::result::Result<(), String> {
         "raytraced.ppm",
         IMAGE_WIDTH as u32,
         IMAGE_HEIGHT as u32,
+        SAMPLES_PER_PIXEL,
         &pixels,
     )
     .map_err(|e| format!("Failed to write ppm, error {}", e))?;

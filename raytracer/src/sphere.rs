@@ -1,5 +1,5 @@
 use crate::hittable::{HitRecord, Hittable};
-use crate::types::{Point, Ray, Real, Vec3};
+use crate::types::{Point, Ray, Real};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sphere {
