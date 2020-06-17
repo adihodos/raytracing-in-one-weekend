@@ -108,11 +108,16 @@ fn main() -> std::result::Result<(), String> {
         Rc::new(Sphere::new(
             Point::new(1f32, 0f32, -1f32),
             0.5f32,
-            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 0.0f32)),
+            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 0.3f32)),
         )),
         Rc::new(Sphere::new(
             Point::new(-1f32, 0f32, -1f32),
             0.5f32,
+            Rc::new(Dielectric::new(1.5f32)),
+        )),
+        Rc::new(Sphere::new(
+            Point::new(-1f32, 0f32, -1f32),
+            -0.45f32,
             Rc::new(Dielectric::new(1.5f32)),
         )),
     ];

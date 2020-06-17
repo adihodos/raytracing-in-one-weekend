@@ -36,11 +36,21 @@ impl Material for Dielectric {
                 attenuation: Color::same(1f32),
             })
         } else {
-            // refract
-            Some(ScatterRecord {
-                attenuation: Color::same(1f32),
-                ray: Ray::new(hit_record.p, refract(uv, hit_record.normal, etai_over_etat)),
-            })
+            // schlick approximation
+            use crate::types::{random_real, schlick};
+            let reflect_probability = schlick(cos_theta, etai_over_etat);
+            if random_real() < reflect_probability {
+                Some(ScatterRecord {
+                    ray: Ray::new(hit_record.p, reflect_unit_vector(uv, hit_record.normal)),
+                    attenuation: Color::same(1f32),
+                })
+            } else {
+                // refract
+                Some(ScatterRecord {
+                    attenuation: Color::same(1f32),
+                    ray: Ray::new(hit_record.p, refract(uv, hit_record.normal, etai_over_etat)),
+                })
+            }
         }
     }
 }

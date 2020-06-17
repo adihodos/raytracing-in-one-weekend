@@ -7,6 +7,9 @@ mod rtow_types {
     pub const C_256: Real = 256f64;
     pub const C_INFINITY: Real = std::f64::INFINITY;
     pub const C_PI: Real = std::f64::consts::PI;
+    pub const C_ONE: Real = 1.0;
+    pub const C_TWO: Real = 2.0;
+    pub const C_ZERO: Real = 0.0;
 }
 
 #[cfg(not(feature = "fp_double_precision"))]
@@ -16,6 +19,9 @@ mod rtow_types {
     pub const C_256: Real = 256f32;
     pub const C_INFINITY: Real = std::f32::INFINITY;
     pub const C_PI: Real = std::f32::consts::PI;
+    pub const C_ONE: Real = 1.0f32;
+    pub const C_TWO: Real = 2.0f32;
+    pub const C_ZERO: Real = 0.0f32;
 }
 
 pub use rtow_types::*;
@@ -87,4 +93,10 @@ pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
     } else {
         -in_unit_sphere
     }
+}
+
+pub fn schlick(cosine: Real, refraction_index: Real) -> Real {
+    let r0 = (C_ONE - refraction_index) / (C_ONE + refraction_index);
+    let r0 = r0 * r0;
+    r0 + (C_ONE - r0) * (C_ONE - cosine).powi(5)
 }
