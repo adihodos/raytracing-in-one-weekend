@@ -98,7 +98,7 @@ fn make_world() -> Vec<Rc<dyn Hittable>> {
         Rc::new(Sphere::new(
             Point::new(1f32, 0f32, -1f32),
             0.5f32,
-            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 0.3f32)),
+            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 0f32)),
         )),
         Rc::new(Sphere::new(
             Point::new(-1f32, 0f32, -1f32),
@@ -140,8 +140,14 @@ fn main() -> std::result::Result<(), String> {
 
     use std::iter::FromIterator;
 
-    let world = HittableList::from_iter(make_world2());
-    let cam = camera::Camera::new(90 as Real, IMAGE_WIDTH as Real / IMAGE_HEIGHT as Real);
+    let world = HittableList::from_iter(make_world());
+    let cam = camera::Camera::new(
+        Point::new(-2 as Real, 2 as Real, 1 as Real),
+        Point::new(0 as Real, 0 as Real, -1 as Real),
+        Point::new(0 as Real, 1 as Real, 0 as Real),
+        20 as Real,
+        IMAGE_WIDTH as Real / IMAGE_HEIGHT as Real,
+    );
 
     (0..IMAGE_HEIGHT).rev().for_each(|y| {
         (0..IMAGE_WIDTH).for_each(|x| {
