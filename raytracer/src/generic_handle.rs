@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GenericHandle<T> {
     handle: u32,

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::hittable::{HitRecord, Hittable};
 use crate::types::{Ray, Real};
 

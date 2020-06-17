@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[cfg(feature = "fp_double_precision")]
 mod rtow_types {
     pub type Real = f64;

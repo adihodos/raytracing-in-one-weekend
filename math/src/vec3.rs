@@ -471,8 +471,6 @@ where
         + std::fmt::Debug
         + std::ops::Mul<TVec3<T>, Output = TVec3<T>>,
 {
-    debug_assert!(is_unit_length(n));
-
     let two = T::one() + T::one();
     v - two * dot(v, n) * n
 }
