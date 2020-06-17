@@ -459,8 +459,8 @@ where
     }
 }
 
-/// Reflect vector v along vector n.
-pub fn reflect<T>(v: TVec3<T>, n: TVec3<T>) -> TVec3<T>
+/// Reflect vector v along unit vector n.
+pub fn reflect_unit_vector<T>(v: TVec3<T>, n: TVec3<T>) -> TVec3<T>
 where
     T: Copy
         + Clone
@@ -471,6 +471,8 @@ where
         + std::fmt::Debug
         + std::ops::Mul<TVec3<T>, Output = TVec3<T>>,
 {
+    debug_assert!(is_unit_length(n));
+
     let two = T::one() + T::one();
     v - two * dot(v, n) * n
 }
