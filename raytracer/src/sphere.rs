@@ -1,15 +1,21 @@
 use crate::hittable::{HitRecord, Hittable};
+use crate::material::Material;
 use crate::types::{Point, Ray, Real};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone)]
 pub struct Sphere {
     pub center: Point,
     pub radius: Real,
+    pub mtl: std::rc::Rc<dyn Material>,
 }
 
 impl Sphere {
-    pub fn new(center: Point, radius: Real) -> Sphere {
-        Sphere { center, radius }
+    pub fn new(center: Point, radius: Real, mtl: std::rc::Rc<dyn Material>) -> Sphere {
+        Sphere {
+            center,
+            radius,
+            mtl,
+        }
     }
 }
 
@@ -29,20 +35,24 @@ impl Hittable for Sphere {
             let temp = (-half_b - root) / a;
             if temp < t_max && temp > t_min {
                 let p = r.at(temp);
-                Some(HitRecord {
-                    t: temp,
+                Some(HitRecord::new(
                     p,
-                    normal: (p - self.center) / self.radius,
-                })
+                    (p - self.center) / self.radius,
+                    r,
+                    temp,
+                    std::rc::Rc::clone(&self.mtl),
+                ))
             } else {
                 let temp = (-half_b + root) / a;
                 if temp < t_max && temp > t_min {
                     let p = r.at(temp);
-                    Some(HitRecord {
-                        t: temp,
+                    Some(HitRecord::new(
                         p,
-                        normal: (p - self.center) / self.radius,
-                    })
+                        (p - self.center) / self.radius,
+                        r,
+                        temp,
+                        std::rc::Rc::clone(&self.mtl),
+                    ))
                 } else {
                     None
                 }

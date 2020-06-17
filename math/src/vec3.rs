@@ -47,6 +47,17 @@ where
     {
         self.length_squared().sqrt()
     }
+
+    pub fn sqrt(&self) -> Self
+    where
+        T: Float + Copy + Clone + std::fmt::Debug,
+    {
+        Self {
+            x: self.x.sqrt(),
+            y: self.y.sqrt(),
+            z: self.z.sqrt(),
+        }
+    }
 }
 
 pub mod consts {
@@ -448,6 +459,22 @@ where
     }
 }
 
+/// Reflect vector v along vector n.
+pub fn reflect<T>(v: TVec3<T>, n: TVec3<T>) -> TVec3<T>
+where
+    T: Copy
+        + Clone
+        + Num
+        + std::ops::Mul
+        + std::ops::Add
+        + std::ops::Sub
+        + std::fmt::Debug
+        + std::ops::Mul<TVec3<T>, Output = TVec3<T>>,
+{
+    let two = T::one() + T::one();
+    v - two * dot(v, n) * n
+}
+
 /// Test if two vectors are parallel using the cross product.
 pub fn are_parallel<T>(a: TVec3<T>, b: TVec3<T>) -> bool
 where
@@ -461,4 +488,19 @@ where
     T: Copy + Clone + Float + std::fmt::Debug,
 {
     (dot(a, b) / (a.length() * b.length())).acos()
+}
+
+/// Test if two vectors are on the same side of a half-space defined by a plane.
+pub fn are_on_the_same_plane_side<T>(a: TVec3<T>, b: TVec3<T>) -> bool
+where
+    T: Copy
+        + Clone
+        + Num
+        + std::ops::Mul
+        + std::ops::Add
+        + std::ops::Sub
+        + std::fmt::Debug
+        + std::cmp::PartialOrd,
+{
+    dot(a, b) > T::zero()
 }

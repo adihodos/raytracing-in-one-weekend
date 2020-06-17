@@ -31,6 +31,11 @@ pub fn random_real() -> Real {
     thread_rng().gen()
 }
 
+pub fn random_real_range(min: Real, max: Real) -> Real {
+    use rand::prelude::*;
+    thread_rng().gen_range(min, max)
+}
+
 pub fn clamp(x: Real, min: Real, max: Real) -> Real {
     if x < min {
         min
@@ -38,5 +43,46 @@ pub fn clamp(x: Real, min: Real, max: Real) -> Real {
         max
     } else {
         x
+    }
+}
+
+pub fn rand_vec3() -> Vec3 {
+    Vec3::new(random_real(), random_real(), random_real())
+}
+
+pub fn rand_vec3_range(min: Real, max: Real) -> Vec3 {
+    Vec3::new(
+        random_real_range(min, max),
+        random_real_range(min, max),
+        random_real_range(min, max),
+    )
+}
+
+pub fn random_in_unit_sphere() -> Vec3 {
+    loop {
+        let p = rand_vec3_range(-1f32, 1f32);
+        if p.length_squared() >= 1f32 {
+            continue;
+        }
+
+        break p;
+    }
+}
+
+pub fn random_unit_vector() -> Vec3 {
+    let a = random_real_range(0f32, 2f32 * C_PI);
+    let z = random_real_range(-1f32, 1f32);
+    let r = (1f32 - z * z).sqrt();
+    Vec3::new(r * a.cos(), r * a.sin(), z)
+}
+
+pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
+    let in_unit_sphere = random_in_unit_sphere();
+    use math::vec3::are_on_the_same_plane_side;
+
+    if are_on_the_same_plane_side(in_unit_sphere, *normal) {
+        in_unit_sphere
+    } else {
+        -in_unit_sphere
     }
 }

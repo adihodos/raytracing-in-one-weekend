@@ -1,11 +1,20 @@
+use std::rc::Rc;
+
 mod camera;
+mod generic_handle;
 mod hittable;
 mod hittable_list;
+mod lambertian;
+mod material;
+mod metal;
 mod sphere;
 mod types;
 
 use hittable::{HitRecord, Hittable};
 use hittable_list::HittableList;
+use lambertian::Lambertian;
+use material::{Material, ScatterRecord};
+use metal::Metal;
 use sphere::Sphere;
 use types::*;
 
@@ -14,7 +23,9 @@ fn write_pixel(
     color: Color,
     samples_per_pixel: i32,
 ) -> std::io::Result<()> {
-    let (r, g, b) = (color * (1f32 / samples_per_pixel as f32)).into();
+    let (r, g, b) = (color * (1f32 / samples_per_pixel as f32))
+        .sqrt() // gamma correct for gamma = 2.0
+        .into();
 
     writeln!(
         w,
@@ -51,26 +62,17 @@ fn write_ppm<P: AsRef<std::path::Path>>(
     Ok(())
 }
 
-fn hit_sphere(center: Point, radius: Real, ray: &Ray) -> f32 {
-    use math::vec3::dot;
-
-    let oc = ray.origin - center;
-    let a = ray.direction.length_squared();
-    let half_b = dot(oc, ray.direction);
-    // let b = 2f32 * dot(oc, ray.direction);
-    let c = oc.length_squared() - radius * radius;
-
-    let delta = half_b * half_b - a * c;
-    if delta < 0f32 {
-        -1f32
-    } else {
-        (-half_b - delta.sqrt()) / a
+fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
+    if depth <= 0 {
+        return Color::same(0f32);
     }
-}
 
-fn ray_color(r: &Ray, world: &HittableList) -> Color {
-    if let Some(rec) = world.hit(r, 0f32, C_INFINITY) {
-        return 0.5f32 * (rec.normal + Color::same(1f32));
+    if let Some(rec) = world.hit(r, 0.001f32, C_INFINITY) {
+        if let Some(scatter) = rec.mtl.scatter(r, &rec) {
+            return scatter.attenuation * ray_color(&scatter.ray, world, depth - 1);
+        } else {
+            return Color::same(0f32);
+        }
     }
 
     use math::vec3::normalize;
@@ -85,15 +87,33 @@ fn main() -> std::result::Result<(), String> {
     const IMAGE_WIDTH: i32 = 384;
     const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
     const SAMPLES_PER_PIXEL: i32 = 100;
+    const MAX_DEPTH: i32 = 50;
 
     let mut pixels = vec![Color::same(0f32); (IMAGE_WIDTH * IMAGE_HEIGHT) as usize];
 
     use std::iter::FromIterator;
-    use std::rc::Rc;
 
     let world_objects: Vec<Rc<dyn Hittable>> = vec![
-        Rc::new(Sphere::new(Point::new(0f32, 0f32, -1f32), 0.5f32)),
-        Rc::new(Sphere::new(Point::new(0f32, -100.5f32, -1f32), 100f32)),
+        Rc::new(Sphere::new(
+            Point::new(0f32, 0f32, -1f32),
+            0.5f32,
+            Rc::new(Lambertian::new(Color::new(0.7f32, 0.3f32, 0.3f32))),
+        )),
+        Rc::new(Sphere::new(
+            Point::new(0f32, -100.5f32, -1f32),
+            100f32,
+            Rc::new(Lambertian::new(Color::new(0.8f32, 0.8f32, 0f32))),
+        )),
+        Rc::new(Sphere::new(
+            Point::new(1f32, 0f32, -1f32),
+            0.5f32,
+            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32))),
+        )),
+        Rc::new(Sphere::new(
+            Point::new(-1f32, 0f32, -1f32),
+            0.5f32,
+            Rc::new(Metal::new(Color::new(0.8f32, 0.8f32, 0.8f32))),
+        )),
     ];
 
     let world = HittableList::from_iter(world_objects);
@@ -105,7 +125,7 @@ fn main() -> std::result::Result<(), String> {
                 let u = (x as Real + random_real()) / (IMAGE_WIDTH - 1) as f32;
                 let v = (y as Real + random_real()) / (IMAGE_HEIGHT - 1) as f32;
                 let r = cam.get_ray(u, v);
-                color + ray_color(&r, &world)
+                color + ray_color(&r, &world, MAX_DEPTH)
             });
 
             pixels[(y * IMAGE_WIDTH + x) as usize] = pixel_color;
