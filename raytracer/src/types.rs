@@ -8,6 +8,7 @@ mod rtow_types {
     pub const C_INFINITY: Real = std::f64::INFINITY;
     pub const C_PI: Real = std::f64::consts::PI;
     pub const C_ONE: Real = 1.0;
+    pub const C_HALF_ONE: Real = 0.5;
     pub const C_TWO: Real = 2.0;
     pub const C_ZERO: Real = 0.0;
 }
@@ -20,6 +21,7 @@ mod rtow_types {
     pub const C_INFINITY: Real = std::f32::INFINITY;
     pub const C_PI: Real = std::f32::consts::PI;
     pub const C_ONE: Real = 1.0f32;
+    pub const C_HALF_ONE: Real = 0.5f32;
     pub const C_TWO: Real = 2.0f32;
     pub const C_ZERO: Real = 0.0f32;
 }
@@ -31,7 +33,7 @@ pub type Point = Vec3;
 pub type Ray = math::ray::TRay<Real>;
 
 pub fn degrees_to_radians(degrees: Real) -> Real {
-    degrees * C_PI / 180f32
+    (degrees * std::f64::consts::PI as Real) / 180 as Real
 }
 
 pub fn random_real() -> Real {
@@ -68,8 +70,8 @@ pub fn rand_vec3_range(min: Real, max: Real) -> Vec3 {
 
 pub fn random_in_unit_sphere() -> Vec3 {
     loop {
-        let p = rand_vec3_range(-1f32, 1f32);
-        if p.length_squared() >= 1f32 {
+        let p = rand_vec3_range(-1 as Real, 1 as Real);
+        if p.length_squared() >= 1 as Real {
             continue;
         }
 
@@ -78,9 +80,9 @@ pub fn random_in_unit_sphere() -> Vec3 {
 }
 
 pub fn random_unit_vector() -> Vec3 {
-    let a = random_real_range(0f32, 2f32 * C_PI);
-    let z = random_real_range(-1f32, 1f32);
-    let r = (1f32 - z * z).sqrt();
+    let a = random_real_range(0 as Real, 2 as Real * C_PI);
+    let z = random_real_range(-1 as Real, 1 as Real);
+    let r = (1 as Real - z * z).sqrt();
     Vec3::new(r * a.cos(), r * a.sin(), z)
 }
 
@@ -96,7 +98,7 @@ pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
 }
 
 pub fn schlick(cosine: Real, refraction_index: Real) -> Real {
-    let r0 = (C_ONE - refraction_index) / (C_ONE + refraction_index);
+    let r0 = (1 as Real - refraction_index) / (1 as Real + refraction_index);
     let r0 = r0 * r0;
-    r0 + (C_ONE - r0) * (C_ONE - cosine).powi(5)
+    r0 + (1 as Real - r0) * (1 as Real - cosine).powi(5)
 }

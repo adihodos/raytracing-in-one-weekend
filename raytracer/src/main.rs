@@ -83,18 +83,8 @@ fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
     (1f32 - t) * Color::same(1f32) + t * Color::new(0.5f32, 0.7f32, 1f32)
 }
 
-fn main() -> std::result::Result<(), String> {
-    const ASPECT_RATIO: Real = 16f32 / 9f32;
-    const IMAGE_WIDTH: i32 = 384;
-    const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
-    const SAMPLES_PER_PIXEL: i32 = 100;
-    const MAX_DEPTH: i32 = 50;
-
-    let mut pixels = vec![Color::same(0f32); (IMAGE_WIDTH * IMAGE_HEIGHT) as usize];
-
-    use std::iter::FromIterator;
-
-    let world_objects: Vec<Rc<dyn Hittable>> = vec![
+fn make_world() -> Vec<Rc<dyn Hittable>> {
+    vec![
         Rc::new(Sphere::new(
             Point::new(0f32, 0f32, -1f32),
             0.5f32,
@@ -120,10 +110,38 @@ fn main() -> std::result::Result<(), String> {
             -0.45f32,
             Rc::new(Dielectric::new(1.5f32)),
         )),
-    ];
+    ]
+}
 
-    let world = HittableList::from_iter(world_objects);
-    let cam = camera::Camera::new();
+fn make_world2() -> Vec<Rc<dyn Hittable>> {
+    let r = (C_PI / 4 as Real).cos();
+    vec![
+        Rc::new(Sphere::new(
+            Point::new(-r, 0 as Real, -1 as Real),
+            r,
+            Rc::new(Lambertian::new(Color::new(0 as Real, 0 as Real, 1 as Real))),
+        )),
+        Rc::new(Sphere::new(
+            Point::new(r, 0 as Real, -1 as Real),
+            r,
+            Rc::new(Lambertian::new(Color::new(1 as Real, 0 as Real, 0 as Real))),
+        )),
+    ]
+}
+
+fn main() -> std::result::Result<(), String> {
+    const ASPECT_RATIO: Real = 16f32 / 9f32;
+    const IMAGE_WIDTH: i32 = 384;
+    const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
+    const SAMPLES_PER_PIXEL: i32 = 100;
+    const MAX_DEPTH: i32 = 50;
+
+    let mut pixels = vec![Color::same(0f32); (IMAGE_WIDTH * IMAGE_HEIGHT) as usize];
+
+    use std::iter::FromIterator;
+
+    let world = HittableList::from_iter(make_world2());
+    let cam = camera::Camera::new(90 as Real, IMAGE_WIDTH as Real / IMAGE_HEIGHT as Real);
 
     (0..IMAGE_HEIGHT).rev().for_each(|y| {
         (0..IMAGE_WIDTH).for_each(|x| {
