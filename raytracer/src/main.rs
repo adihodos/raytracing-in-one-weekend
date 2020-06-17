@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 mod camera;
+mod dielectric;
 mod generic_handle;
 mod hittable;
 mod hittable_list;
@@ -10,6 +11,7 @@ mod metal;
 mod sphere;
 mod types;
 
+use dielectric::Dielectric;
 use hittable::Hittable;
 use hittable_list::HittableList;
 use lambertian::Lambertian;
@@ -96,7 +98,7 @@ fn main() -> std::result::Result<(), String> {
         Rc::new(Sphere::new(
             Point::new(0f32, 0f32, -1f32),
             0.5f32,
-            Rc::new(Lambertian::new(Color::new(0.7f32, 0.3f32, 0.3f32))),
+            Rc::new(Lambertian::new(Color::new(0.1f32, 0.2f32, 0.5f32))),
         )),
         Rc::new(Sphere::new(
             Point::new(0f32, -100.5f32, -1f32),
@@ -106,12 +108,12 @@ fn main() -> std::result::Result<(), String> {
         Rc::new(Sphere::new(
             Point::new(1f32, 0f32, -1f32),
             0.5f32,
-            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 1.0f32)),
+            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 0.0f32)),
         )),
         Rc::new(Sphere::new(
             Point::new(-1f32, 0f32, -1f32),
             0.5f32,
-            Rc::new(Metal::new(Color::new(0.8f32, 0.8f32, 0.8f32), 0.3f32)),
+            Rc::new(Dielectric::new(1.5f32)),
         )),
     ];
 

@@ -475,6 +475,24 @@ where
     v - two * dot(v, n) * n
 }
 
+/// Refract vector uv along normal n, given the ratio of refraction indices
+pub fn refract<T>(uv: TVec3<T>, n: TVec3<T>, etai_over_etat: T) -> TVec3<T>
+where
+    T: Copy
+        + Clone
+        + Float
+        + std::ops::Mul
+        + std::ops::Add
+        + std::ops::Sub
+        + std::fmt::Debug
+        + std::ops::Mul<TVec3<T>, Output = TVec3<T>>,
+{
+    let cos_theta = dot(-uv, n);
+    let r_out_parallel = etai_over_etat * (uv + cos_theta * n);
+    let r_out_perp = -(T::one() - r_out_parallel.length_squared()).sqrt() * n;
+    r_out_parallel + r_out_perp
+}
+
 /// Test if two vectors are parallel using the cross product.
 pub fn are_parallel<T>(a: TVec3<T>, b: TVec3<T>) -> bool
 where
