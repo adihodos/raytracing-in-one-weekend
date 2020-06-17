@@ -97,6 +97,22 @@ pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
     }
 }
 
+pub fn random_in_unit_disk() -> Vec3 {
+    loop {
+        let v = Vec3::new(
+            random_real_range(-1 as Real, 1 as Real),
+            random_real_range(-1 as Real, 1 as Real),
+            0 as Real,
+        );
+
+        if v.length_squared() >= 1 as Real {
+            continue;
+        }
+
+        break v;
+    }
+}
+
 pub fn schlick(cosine: Real, refraction_index: Real) -> Real {
     let r0 = (1 as Real - refraction_index) / (1 as Real + refraction_index);
     let r0 = r0 * r0;

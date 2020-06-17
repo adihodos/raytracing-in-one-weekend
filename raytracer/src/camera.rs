@@ -6,6 +6,10 @@ pub struct Camera {
     lower_left_corner: Point,
     horizontal: Vec3,
     vertical: Vec3,
+    u: Vec3,
+    v: Vec3,
+    w: Vec3,
+    lens_radius: Real,
 }
 
 impl Camera {
@@ -15,6 +19,8 @@ impl Camera {
         world_up: Vec3,
         vertical_fov: Real,
         aspect_ratio: Real,
+        aperture: Real,
+        focus_dist: Real,
     ) -> Camera {
         use crate::types::degrees_to_radians;
         use math::vec3::{cross, normalize};
@@ -32,16 +38,27 @@ impl Camera {
 
         Camera {
             origin: lookfrom,
-            lower_left_corner: lookfrom - v * half_height - u * half_width - w,
-            horizontal: u * half_width * 2 as Real,
-            vertical: v * half_height * 2 as Real,
+            lower_left_corner: lookfrom
+                - focus_dist * v * half_height
+                - focus_dist * u * half_width
+                - focus_dist * w,
+            horizontal: focus_dist * u * half_width * 2 as Real,
+            vertical: focus_dist * v * half_height * 2 as Real,
+            lens_radius: aperture * 0.5 as Real,
+            u,
+            v,
+            w,
         }
     }
 
     pub fn get_ray(&self, s: Real, t: Real) -> Ray {
+        use crate::types::random_in_unit_disk;
+        let rd = self.lens_radius * random_in_unit_disk();
+        let offset = self.u * rd.x + self.v * rd.y;
+
         Ray::new(
-            self.origin,
-            self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin,
+            self.origin + offset,
+            self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
         )
     }
 }

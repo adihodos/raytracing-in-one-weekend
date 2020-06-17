@@ -141,12 +141,21 @@ fn main() -> std::result::Result<(), String> {
     use std::iter::FromIterator;
 
     let world = HittableList::from_iter(make_world());
+
+    let look_from = Point::new(3 as Real, 3 as Real, 2 as Real);
+    let look_at = Point::new(0 as Real, 0 as Real, -1 as Real);
+    let world_up = Vec3::new(0 as Real, 1 as Real, 0 as Real);
+    let aperture = 2 as Real;
+    let focus_dist = (look_from - look_at).length();
+
     let cam = camera::Camera::new(
-        Point::new(-2 as Real, 2 as Real, 1 as Real),
-        Point::new(0 as Real, 0 as Real, -1 as Real),
-        Point::new(0 as Real, 1 as Real, 0 as Real),
+        look_from,
+        look_at,
+        world_up,
         20 as Real,
         IMAGE_WIDTH as Real / IMAGE_HEIGHT as Real,
+        aperture,
+        focus_dist,
     );
 
     (0..IMAGE_HEIGHT).rev().for_each(|y| {
