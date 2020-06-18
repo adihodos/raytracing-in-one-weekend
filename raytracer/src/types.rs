@@ -28,9 +28,9 @@ mod rtow_types {
 
 pub use rtow_types::*;
 pub type Vec3 = math::vec3::TVec3<Real>;
-pub type Color = Vec3;
-pub type Point = Vec3;
 pub type Ray = math::ray::TRay<Real>;
+pub type Point = Vec3;
+pub type Color = math::vec3::TVec3<f32>;
 
 pub fn degrees_to_radians(degrees: Real) -> Real {
     (degrees * std::f64::consts::PI as Real) / 180 as Real
@@ -58,6 +58,22 @@ pub fn clamp(x: Real, min: Real, max: Real) -> Real {
 
 pub fn rand_vec3() -> Vec3 {
     Vec3::new(random_real(), random_real(), random_real())
+}
+
+pub fn random_color() -> Color {
+    Color::new(
+        random_real_range(0f32, 1f32),
+        random_real_range(0f32, 1f32),
+        random_real_range(0f32, 1f32),
+    )
+}
+
+pub fn random_color_in_range(min: Real, max: Real) -> Color {
+    Color::new(
+        random_real_range(min, max),
+        random_real_range(min, max),
+        random_real_range(min, max),
+    )
 }
 
 pub fn rand_vec3_range(min: Real, max: Real) -> Vec3 {
