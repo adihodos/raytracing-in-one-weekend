@@ -1,6 +1,6 @@
 use crate::hittable::HitRecord;
 use crate::material::{Material, ScatterRecord};
-use crate::types::{random_unit_vector, Color, Ray, Vec3};
+use crate::types::{random_unit_vector, Color, Ray};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Lambertian {

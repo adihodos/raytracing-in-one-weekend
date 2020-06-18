@@ -7,6 +7,6 @@ pub struct ScatterRecord {
     pub attenuation: Color,
 }
 
-pub trait Material {
+pub trait Material: Send + Sync {
     fn scatter(&self, ray: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord>;
 }

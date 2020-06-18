@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 mod camera;
 mod dielectric;
@@ -90,57 +90,11 @@ fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
     (1f32 - t) * Color::same(1f32) + t * Color::new(0.5f32, 0.7f32, 1f32)
 }
 
-fn make_world() -> Vec<Rc<dyn Hittable>> {
-    vec![
-        Rc::new(Sphere::new(
-            Point::new(0f32, 0f32, -1f32),
-            0.5f32,
-            Rc::new(Lambertian::new(Color::new(0.1f32, 0.2f32, 0.5f32))),
-        )),
-        Rc::new(Sphere::new(
-            Point::new(0f32, -100.5f32, -1f32),
-            100f32,
-            Rc::new(Lambertian::new(Color::new(0.8f32, 0.8f32, 0f32))),
-        )),
-        Rc::new(Sphere::new(
-            Point::new(1f32, 0f32, -1f32),
-            0.5f32,
-            Rc::new(Metal::new(Color::new(0.8f32, 0.6f32, 0.2f32), 0f32)),
-        )),
-        Rc::new(Sphere::new(
-            Point::new(-1f32, 0f32, -1f32),
-            0.5f32,
-            Rc::new(Dielectric::new(1.5f32)),
-        )),
-        Rc::new(Sphere::new(
-            Point::new(-1f32, 0f32, -1f32),
-            -0.45f32,
-            Rc::new(Dielectric::new(1.5f32)),
-        )),
-    ]
-}
-
-fn make_world2() -> Vec<Rc<dyn Hittable>> {
-    let r = (C_PI / 4 as Real).cos();
-    vec![
-        Rc::new(Sphere::new(
-            Point::new(-r, 0 as Real, -1 as Real),
-            r,
-            Rc::new(Lambertian::new(Color::new(0 as Real, 0 as Real, 1 as Real))),
-        )),
-        Rc::new(Sphere::new(
-            Point::new(r, 0 as Real, -1 as Real),
-            r,
-            Rc::new(Lambertian::new(Color::new(1 as Real, 0 as Real, 0 as Real))),
-        )),
-    ]
-}
-
 fn make_random_world() -> HittableList {
-    let ground_material = Rc::new(Lambertian::new(Color::same(0.5f32)));
+    let ground_material = Arc::new(Lambertian::new(Color::same(0.5f32)));
     let mut world = HittableList::new();
 
-    world.add(Rc::new(Sphere::new(
+    world.add(Arc::new(Sphere::new(
         Point::new(0 as Real, -1000 as Real, 0 as Real),
         1000 as Real,
         ground_material,
@@ -158,45 +112,45 @@ fn make_random_world() -> HittableList {
                 use crate::material::Material;
                 let choose_mat = random_real();
 
-                let sphere_material: Rc<dyn Material> = if choose_mat < 0.8 as Real {
+                let sphere_material: Arc<dyn Material> = if choose_mat < 0.8 as Real {
                     // diffuse
                     let albedo = random_color() * random_color();
-                    Rc::new(Lambertian::new(albedo))
+                    Arc::new(Lambertian::new(albedo))
                 } else if choose_mat < 0.95 as Real {
                     // metal
                     let albedo = random_color_in_range(0.5 as Real, 1 as Real);
                     let fuzziness = random_real_range(0 as Real, 0.5 as Real);
-                    Rc::new(Metal::new(albedo, fuzziness))
+                    Arc::new(Metal::new(albedo, fuzziness))
                 } else {
                     // glass
-                    Rc::new(Dielectric::new(1.5 as Real))
+                    Arc::new(Dielectric::new(1.5 as Real))
                 };
 
-                world.add(Rc::new(Sphere::new(center, 0.2 as Real, sphere_material)));
+                world.add(Arc::new(Sphere::new(center, 0.2 as Real, sphere_material)));
             }
         });
     });
 
-    world.add(Rc::new(Sphere::new(
+    world.add(Arc::new(Sphere::new(
         Point::new(0 as Real, 1 as Real, 0 as Real),
         1 as Real,
-        Rc::new(Dielectric::new(1.5 as Real)),
+        Arc::new(Dielectric::new(1.5 as Real)),
     )));
 
-    world.add(Rc::new(Sphere::new(
+    world.add(Arc::new(Sphere::new(
         Point::new(-4 as Real, 1 as Real, 0 as Real),
         1 as Real,
-        Rc::new(Lambertian::new(Color::new(
+        Arc::new(Lambertian::new(Color::new(
             0.4 as Real,
             0.2 as Real,
             0.1 as Real,
         ))),
     )));
 
-    world.add(Rc::new(Sphere::new(
+    world.add(Arc::new(Sphere::new(
         Point::new(4 as Real, 1 as Real, 0 as Real),
         1 as Real,
-        Rc::new(Metal::new(
+        Arc::new(Metal::new(
             Color::new(0.7 as Real, 0.6 as Real, 0.5 as Real),
             0 as Real,
         )),
@@ -205,66 +159,235 @@ fn make_random_world() -> HittableList {
     world
 }
 
+fn test_mt() {
+    use std::thread;
+
+    let mtls = Arc::new(vec![1024, 0, 945, 100]);
+    let v = Arc::new(vec![0, 0, 0, 0]);
+
+    let threads = (0..4)
+        .map(|i| {
+            let v = v.clone();
+            let m = mtls.clone();
+            let t = thread::spawn(move || {
+                let res = v.iter().fold(0, |acc, mtl_idx| acc + m[*mtl_idx as usize]);
+                println!("Worker {}, result {}", i, res);
+            });
+            t
+        })
+        .collect::<Vec<_>>();
+
+    threads
+        .into_iter()
+        .for_each(|t| t.join().expect("Failed to join worker!"));
+}
+
+#[derive(Copy, Clone, Debug)]
+struct RaytracerParams {
+    workers: i32,
+    aspect_ratio: Real,
+    image_width: i32,
+    image_height: i32,
+    samples_per_pixel: i32,
+    max_ray_depth: i32,
+    vertical_fov: Real,
+    look_from: Point,
+    look_at: Point,
+    world_up: Vec3,
+    aperture: Real,
+    focus_dist: Real,
+}
+
+#[derive(Copy, Clone, Debug)]
+struct WorkBlock {
+    xdim: (i32, i32),
+    ydim: (i32, i32),
+}
+
+#[derive(Copy, Clone, Debug)]
+struct ImageOutput {
+    pixels: *mut Color,
+    width: i32,
+    height: i32,
+}
+
+unsafe impl std::marker::Send for ImageOutput {}
+unsafe impl std::marker::Sync for ImageOutput {}
+
+fn raytrace_mt(params: RaytracerParams) -> Vec<Color> {
+    const WORKER_BLOCK_DIM: i32 = 16;
+
+    let blocks_x = (params.image_width / WORKER_BLOCK_DIM) + 1;
+    let blocks_y = (params.image_height / WORKER_BLOCK_DIM) + 1;
+
+    let mut workblocks = vec![];
+    (0..blocks_y).for_each(|yblk| {
+        (0..blocks_x).for_each(|xblk| {
+            workblocks.push(WorkBlock {
+                xdim: (
+                    (xblk * WORKER_BLOCK_DIM).min(params.image_width),
+                    ((xblk + 1) * WORKER_BLOCK_DIM).min(params.image_width),
+                ),
+                ydim: (
+                    (yblk * WORKER_BLOCK_DIM).min(params.image_height),
+                    ((yblk + 1) * WORKER_BLOCK_DIM).min(params.image_height),
+                ),
+            });
+        });
+    });
+
+    let cam = camera::Camera::new(
+        params.look_from,
+        params.look_at,
+        params.world_up,
+        params.vertical_fov,
+        params.aspect_ratio,
+        params.aperture,
+        params.focus_dist,
+    );
+
+    let total_workblocks = workblocks.len();
+    let world = Arc::new(make_random_world());
+    use std::sync::Mutex;
+    let workblocks = Arc::new(Mutex::new(workblocks));
+    let mut image_pixels =
+        vec![Color::same(0f32); (params.image_width * params.image_height) as usize];
+
+    let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
+
+    let workers = (0..params.workers)
+        .map(|worker_idx| {
+            let workblocks = Arc::clone(&workblocks);
+            let world = Arc::clone(&world);
+            let output_pixels = ImageOutput {
+                pixels: image_pixels.as_mut_ptr(),
+                width: params.image_width,
+                height: params.image_height,
+            };
+            let workblocks_done = Arc::clone(&workblocks_done);
+
+            std::thread::spawn(move || loop {
+                //
+                // pop a work package from the queue
+                let maybe_this_work_pkg = if let Ok(ref mut work_queue) = workblocks.lock() {
+                    work_queue.pop()
+                } else {
+                    None
+                };
+
+                if let Some(this_work_pkg) = maybe_this_work_pkg {
+                    //
+                    // process pixels in this work package
+                    (this_work_pkg.ydim.0..this_work_pkg.ydim.1)
+                        .rev()
+                        .for_each(|y| {
+                            (this_work_pkg.xdim.0..this_work_pkg.xdim.1).for_each(|x| {
+                                //
+                                // Raytrace this pixel
+                                let pixel_color = (0..params.samples_per_pixel).fold(
+                                    Color::same(0f32),
+                                    |color, _| {
+                                        let u = (x as Real + random_real())
+                                            / (params.image_width - 1) as Real;
+                                        let v = 1 as Real
+                                            - (y as Real + random_real())
+                                                / (params.image_height - 1) as Real;
+                                        let r = cam.get_ray(u, v);
+                                        color + ray_color(&r, &world, params.max_ray_depth)
+                                    },
+                                );
+
+                                unsafe {
+                                    output_pixels
+                                        .pixels
+                                        .add((y * params.image_width + x) as usize)
+                                        .write(pixel_color);
+                                }
+                            });
+                        });
+
+                    workblocks_done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                } else {
+                    println!(
+                        "No more work or queue locking failure, worker {} quitting ...",
+                        worker_idx
+                    );
+                    break;
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    loop {
+        let processed = workblocks_done.load(std::sync::atomic::Ordering::SeqCst);
+        println!(
+            "Processed {} workblocks out of {} total",
+            processed, total_workblocks
+        );
+
+        if processed == total_workblocks as i32 {
+            break;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
+    workers
+        .into_iter()
+        .for_each(|w| w.join().expect("Failed to join worker!"));
+
+    image_pixels
+}
+
 fn main() -> std::result::Result<(), String> {
     const ASPECT_RATIO: Real = 16f32 / 9f32;
     const IMAGE_WIDTH: i32 = 1200;
     const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
-    const SAMPLES_PER_PIXEL: i32 = 128;
+    const SAMPLES_PER_PIXEL: i32 = 64;
     const MAX_DEPTH: i32 = 50;
-
-    let world = make_random_world();
 
     let look_from = Point::new(13 as Real, 2 as Real, 3 as Real);
     let look_at = Point::new(0 as Real, 0 as Real, 0 as Real);
     let world_up = Vec3::new(0 as Real, 1 as Real, 0 as Real);
     let aperture = 0.1 as Real;
     let focus_dist = 10 as Real;
+    let vertical_fov = 20 as Real;
 
-    let cam = camera::Camera::new(
-        look_from,
+    let params = RaytracerParams {
+        workers: 1,
+        image_width: IMAGE_WIDTH,
+        image_height: IMAGE_HEIGHT,
+        samples_per_pixel: SAMPLES_PER_PIXEL,
+        max_ray_depth: MAX_DEPTH,
+        aspect_ratio: ASPECT_RATIO,
         look_at,
+        look_from,
         world_up,
-        20 as Real,
-        IMAGE_WIDTH as Real / IMAGE_HEIGHT as Real,
         aperture,
         focus_dist,
-    );
-
-    let mut pixels = vec![Color::same(0f32); (IMAGE_WIDTH * IMAGE_HEIGHT) as usize];
+        vertical_fov,
+    };
 
     let start_time = std::time::Instant::now();
-    (0..IMAGE_HEIGHT).rev().for_each(|y| {
-        println!("Scanlines remaining: {}", y);
-        (0..IMAGE_WIDTH).for_each(|x| {
-            let pixel_color = (0..SAMPLES_PER_PIXEL).fold(Color::same(0f32), |color, _| {
-                let u = (x as Real + random_real()) / (IMAGE_WIDTH - 1) as f32;
-                let v = 1 as Real - (y as Real + random_real()) / (IMAGE_HEIGHT - 1) as f32;
-                let r = cam.get_ray(u, v);
-                color + ray_color(&r, &world, MAX_DEPTH)
-            });
-
-            pixels[(y * IMAGE_WIDTH + x) as usize] = pixel_color;
-        });
-    });
-
+    let raytraced_pixels = raytrace_mt(params);
     let render_duration = start_time.elapsed();
 
     let minutes = render_duration.as_secs() / 60u64;
     let seconds = (render_duration - std::time::Duration::from_secs(minutes * 60u64)).as_secs();
 
     println!(
-        "Finished! Total render time = {} minutes {} seconds\nWriting rendered image ...",
-        minutes, seconds
+        "Finished! Rendering settings : {:?}\nTotal render time = {} minutes {} seconds",
+        params, minutes, seconds
     );
 
     write_png(
-        "raytraced.png",
-        IMAGE_WIDTH as u32,
-        IMAGE_HEIGHT as u32,
-        SAMPLES_PER_PIXEL,
-        &pixels,
+        "raytraced_mt.png",
+        params.image_width as u32,
+        params.image_height as u32,
+        params.samples_per_pixel,
+        &raytraced_pixels,
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("Failed to write image, error {}", e))?;
 
     Ok(())
 }

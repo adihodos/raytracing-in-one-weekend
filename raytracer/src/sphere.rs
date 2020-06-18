@@ -6,11 +6,11 @@ use crate::types::{Point, Ray, Real};
 pub struct Sphere {
     pub center: Point,
     pub radius: Real,
-    pub mtl: std::rc::Rc<dyn Material>,
+    pub mtl: std::sync::Arc<dyn Material>,
 }
 
 impl Sphere {
-    pub fn new(center: Point, radius: Real, mtl: std::rc::Rc<dyn Material>) -> Sphere {
+    pub fn new(center: Point, radius: Real, mtl: std::sync::Arc<dyn Material>) -> Sphere {
         Sphere {
             center,
             radius,
@@ -40,7 +40,7 @@ impl Hittable for Sphere {
                     (p - self.center) / self.radius,
                     r,
                     temp,
-                    std::rc::Rc::clone(&self.mtl),
+                    std::sync::Arc::clone(&self.mtl),
                 ))
             } else {
                 let temp = (-half_b + root) / a;
@@ -51,7 +51,7 @@ impl Hittable for Sphere {
                         (p - self.center) / self.radius,
                         r,
                         temp,
-                        std::rc::Rc::clone(&self.mtl),
+                        std::sync::Arc::clone(&self.mtl),
                     ))
                 } else {
                     None

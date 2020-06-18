@@ -5,7 +5,7 @@ use crate::types::{Ray, Real};
 
 #[derive(Clone)]
 pub struct HittableList {
-    objects: Vec<std::rc::Rc<dyn Hittable>>,
+    objects: Vec<std::sync::Arc<dyn Hittable>>,
 }
 
 impl HittableList {
@@ -19,15 +19,15 @@ impl HittableList {
         self.objects.clear()
     }
 
-    pub fn add(&mut self, object: std::rc::Rc<dyn Hittable>) {
+    pub fn add(&mut self, object: std::sync::Arc<dyn Hittable>) {
         self.objects.push(object);
     }
 }
 
-impl std::iter::FromIterator<std::rc::Rc<dyn Hittable>> for HittableList {
+impl std::iter::FromIterator<std::sync::Arc<dyn Hittable>> for HittableList {
     fn from_iter<T>(i: T) -> Self
     where
-        T: std::iter::IntoIterator<Item = std::rc::Rc<dyn Hittable>>,
+        T: std::iter::IntoIterator<Item = std::sync::Arc<dyn Hittable>>,
     {
         HittableList {
             objects: Vec::from_iter(i),

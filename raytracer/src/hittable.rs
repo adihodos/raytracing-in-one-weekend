@@ -6,7 +6,7 @@ pub struct HitRecord {
     pub p: Point,
     pub normal: Vec3,
     pub t: Real,
-    pub mtl: std::rc::Rc<dyn Material>,
+    pub mtl: std::sync::Arc<dyn Material>,
     pub front_face: bool,
 }
 
@@ -16,7 +16,7 @@ impl HitRecord {
         outward_normal: Vec3,
         ray: &Ray,
         t: Real,
-        mtl: std::rc::Rc<dyn Material>,
+        mtl: std::sync::Arc<dyn Material>,
     ) -> HitRecord {
         let front_face = !math::vec3::are_on_the_same_plane_side(ray.direction, outward_normal);
         HitRecord {
@@ -27,12 +27,12 @@ impl HitRecord {
                 -outward_normal
             },
             t,
-            mtl: std::rc::Rc::clone(&mtl),
+            mtl: std::sync::Arc::clone(&mtl),
             front_face,
         }
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Send + Sync {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord>;
 }
