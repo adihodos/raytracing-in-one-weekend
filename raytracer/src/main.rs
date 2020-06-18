@@ -209,8 +209,7 @@ fn main() -> std::result::Result<(), String> {
     const ASPECT_RATIO: Real = 16f32 / 9f32;
     const IMAGE_WIDTH: i32 = 1200;
     const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
-    const SAMPLES_PER_PIXEL: i32 = 16;
-    //128;
+    const SAMPLES_PER_PIXEL: i32 = 128;
     const MAX_DEPTH: i32 = 50;
 
     let world = make_random_world();
