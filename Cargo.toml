@@ -1,2 +1,5 @@
 [workspace]
 members = [ "math", "raytracer" ]
+
+[profile.release]
+debug = true

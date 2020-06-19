@@ -11,6 +11,7 @@ mod rtow_types {
     pub const C_HALF_ONE: Real = 0.5;
     pub const C_TWO: Real = 2.0;
     pub const C_ZERO: Real = 0.0;
+    pub const FP_MODEL: &'static str = "double";
 }
 
 #[cfg(not(feature = "fp_double_precision"))]
@@ -24,16 +25,17 @@ mod rtow_types {
     pub const C_HALF_ONE: Real = 0.5f32;
     pub const C_TWO: Real = 2.0f32;
     pub const C_ZERO: Real = 0.0f32;
+    pub const FP_MODEL: &'static str = "single";
 }
 
 pub use rtow_types::*;
 pub type Vec3 = math::vec3::TVec3<Real>;
 pub type Ray = math::ray::TRay<Real>;
 pub type Point = Vec3;
-pub type Color = math::vec3::TVec3<f32>;
+pub type Color = Vec3;
 
 pub fn degrees_to_radians(degrees: Real) -> Real {
-    (degrees * std::f64::consts::PI as Real) / 180 as Real
+    (degrees * C_PI) / 180 as Real
 }
 
 pub fn random_real() -> Real {
@@ -62,9 +64,9 @@ pub fn rand_vec3() -> Vec3 {
 
 pub fn random_color() -> Color {
     Color::new(
-        random_real_range(0f32, 1f32),
-        random_real_range(0f32, 1f32),
-        random_real_range(0f32, 1f32),
+        random_real_range(0 as Real, 1 as Real),
+        random_real_range(0 as Real, 1 as Real),
+        random_real_range(0 as Real, 1 as Real),
     )
 }
 

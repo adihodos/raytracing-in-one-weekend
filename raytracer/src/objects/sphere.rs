@@ -30,7 +30,7 @@ impl Hittable for Sphere {
 
         let delta = half_b * half_b - a * c;
 
-        if delta > 0f32 {
+        if delta > 0 as Real {
             let root = delta.sqrt();
             let temp = (-half_b - root) / a;
             if temp < t_max && temp > t_min {

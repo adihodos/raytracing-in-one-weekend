@@ -18,3 +18,26 @@ Total render time = 2 minutes 1 seconds
 real    2m1,537s
 user    15m59,836s
 sys     0m0,256s
+
+Finished! Rendering settings : RaytracerParams { workers: 8, aspect_ratio: 1.5, image_width: 1200, image_height: 800, samples_per_pixel: 64, max_ray_depth: 50, vertical_fov: 20.0, look_from: TVec3 { x: 13.0, y: 2.0, z: 3.0 }, look_at: TVec3 { x: 0.0, y: 0.0, z: 0.0 }, world_up: TVec3 { x: 0.0, y: 1.0, z: 0.0 }, aperture: 0.1, focus_dist: 10.0 }
+Total render time = 2 minutes 28 seconds
+
+real    2m28,239s
+user    19m17,676s
+sys     0m0,491s
+
+Finished! Rendering settings : floating point model: single precision
+RaytracerParams { workers: 8, aspect_ratio: 1.5, image_width: 1200, image_height: 800, samples_per_pixel: 64, max_ray_depth: 50, vertical_fov: 20.0, look_from: TVec3 { x: 13.0, y: 2.0, z: 3.0 }, look_at: TVec3 { x: 0.0, y: 0.0, z: 0.0 }, world_up: TVec3 { x: 0.0, y: 1.0, z: 0.0 }, aperture: 0.1, focus_dist: 10.0 }
+Total render time = 2 minutes 23 seconds
+
+real    2m23,552s
+user    18m52,214s
+sys     0m0,264s
+
+Finished! Rendering settings : floating point model: double precision
+RaytracerParams { workers: 8, aspect_ratio: 1.5, image_width: 1200, image_height: 800, samples_per_pixel: 64, max_ray_depth: 50, vertical_fov: 20.0, look_from: TVec3 { x: 13.0, y: 2.0, z: 3.0 }, look_at: TVec3 { x: 0.0, y: 0.0, z: 0.0 }, world_up: TVec3 { x: 0.0, y: 1.0, z: 0.0 }, aperture: 0.1, focus_dist: 10.0 }
+Total render time = 2 minutes 27 seconds
+
+real    2m27,967s
+user    19m25,111s
+sys     0m0,332s

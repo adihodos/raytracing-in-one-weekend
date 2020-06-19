@@ -6,7 +6,12 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+    fp_double_precision = []
+
 [dependencies]
     math = { path = "../math" }
     rand = "0.7"
     png = "0.16"
+    num = "0.2"
+    num-traits = "0.2"

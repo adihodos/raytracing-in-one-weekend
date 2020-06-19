@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::sync::Arc;
 
 mod camera;
@@ -8,7 +10,8 @@ mod hittable_list;
 mod lambertian;
 mod material;
 mod metal;
-mod sphere;
+mod objects;
+
 mod types;
 
 use dielectric::Dielectric;
@@ -16,7 +19,8 @@ use hittable::Hittable;
 use hittable_list::HittableList;
 use lambertian::Lambertian;
 use metal::Metal;
-use sphere::Sphere;
+use objects::{disk::Disk, plane::Plane, sphere::Sphere};
+
 use types::*;
 
 fn write_png<P: AsRef<std::path::Path>>(
@@ -72,26 +76,26 @@ fn write_png<P: AsRef<std::path::Path>>(
 
 fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
     if depth <= 0 {
-        return Color::same(0f32);
+        return Color::same(0 as Real);
     }
 
-    if let Some(rec) = world.hit(r, 0.001f32, C_INFINITY) {
+    if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
             return scatter.attenuation * ray_color(&scatter.ray, world, depth - 1);
         } else {
-            return Color::same(0f32);
+            return Color::same(0 as Real);
         }
     }
 
     use math::vec3::normalize;
     let unit_direction = normalize(r.direction);
-    let t = 0.5f32 * (unit_direction.y + 1.0);
+    let t = 0.5 as Real * (unit_direction.y + 1 as Real);
 
-    (1f32 - t) * Color::same(1f32) + t * Color::new(0.5f32, 0.7f32, 1f32)
+    (1 as Real - t) * Color::same(1 as Real) + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
 }
 
 fn make_random_world() -> HittableList {
-    let ground_material = Arc::new(Lambertian::new(Color::same(0.5f32)));
+    let ground_material = Arc::new(Lambertian::new(Color::same(0.5 as Real)));
     let mut world = HittableList::new();
 
     world.add(Arc::new(Sphere::new(
@@ -159,27 +163,34 @@ fn make_random_world() -> HittableList {
     world
 }
 
-fn test_mt() {
-    use std::thread;
+fn make_random_world2() -> HittableList {
+    let ground_mtl = Arc::new(Lambertian::new(Color::new(
+        0.9 as Real,
+        0.3 as Real,
+        0 as Real,
+    )));
 
-    let mtls = Arc::new(vec![1024, 0, 945, 100]);
-    let v = Arc::new(vec![0, 0, 0, 0]);
+    let mut world = HittableList::new();
+    world.add(Arc::new(Plane {
+        origin: Point::same(0 as Real),
+        normal: Vec3::new(0 as Real, 1 as Real, 0 as Real),
+        mtl: ground_mtl,
+    }));
 
-    let threads = (0..4)
-        .map(|i| {
-            let v = v.clone();
-            let m = mtls.clone();
-            let t = thread::spawn(move || {
-                let res = v.iter().fold(0, |acc, mtl_idx| acc + m[*mtl_idx as usize]);
-                println!("Worker {}, result {}", i, res);
-            });
-            t
-        })
-        .collect::<Vec<_>>();
+    let disk_mtl = Arc::new(Lambertian::new(Color::new(
+        0 as Real,
+        0.9 as Real,
+        0.1 as Real,
+    )));
 
-    threads
-        .into_iter()
-        .for_each(|t| t.join().expect("Failed to join worker!"));
+    world.add(Arc::new(Disk {
+        origin: Point::new(0 as Real, 0 as Real, -1 as Real),
+        normal: Vec3::new(0 as Real, 0 as Real, 1 as Real),
+        radius: 0.5 as Real,
+        mtl: disk_mtl,
+    }));
+
+    world
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -214,7 +225,7 @@ struct ImageOutput {
 unsafe impl std::marker::Send for ImageOutput {}
 unsafe impl std::marker::Sync for ImageOutput {}
 
-fn raytrace_mt(params: RaytracerParams) -> Vec<Color> {
+fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
     const WORKER_BLOCK_DIM: i32 = 16;
 
     let blocks_x = (params.image_width / WORKER_BLOCK_DIM) + 1;
@@ -247,11 +258,11 @@ fn raytrace_mt(params: RaytracerParams) -> Vec<Color> {
     );
 
     let total_workblocks = workblocks.len();
-    let world = Arc::new(make_random_world());
+    let world = Arc::new(world);
     use std::sync::Mutex;
     let workblocks = Arc::new(Mutex::new(workblocks));
     let mut image_pixels =
-        vec![Color::same(0f32); (params.image_width * params.image_height) as usize];
+        vec![Color::same(0 as Real); (params.image_width * params.image_height) as usize];
 
     let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
 
@@ -285,7 +296,7 @@ fn raytrace_mt(params: RaytracerParams) -> Vec<Color> {
                                 //
                                 // Raytrace this pixel
                                 let pixel_color = (0..params.samples_per_pixel).fold(
-                                    Color::same(0f32),
+                                    Color::same(0 as Real),
                                     |color, _| {
                                         let u = (x as Real + random_real())
                                             / (params.image_width - 1) as Real;
@@ -340,10 +351,11 @@ fn raytrace_mt(params: RaytracerParams) -> Vec<Color> {
 }
 
 fn main() -> std::result::Result<(), String> {
-    const ASPECT_RATIO: Real = 16f32 / 9f32;
+    println!("Floating point precision: {}", FP_MODEL);
+    // const ASPECT_RATIO: Real = 16f32 / 9f32;
     const IMAGE_WIDTH: i32 = 1200;
-    const IMAGE_HEIGHT: i32 = (IMAGE_WIDTH as f32 / ASPECT_RATIO) as i32;
-    const SAMPLES_PER_PIXEL: i32 = 64;
+    const IMAGE_HEIGHT: i32 = 800;
+    const SAMPLES_PER_PIXEL: i32 = 16;
     const MAX_DEPTH: i32 = 50;
 
     let look_from = Point::new(13 as Real, 2 as Real, 3 as Real);
@@ -354,12 +366,12 @@ fn main() -> std::result::Result<(), String> {
     let vertical_fov = 20 as Real;
 
     let params = RaytracerParams {
-        workers: 1,
+        workers: 8,
         image_width: IMAGE_WIDTH,
         image_height: IMAGE_HEIGHT,
         samples_per_pixel: SAMPLES_PER_PIXEL,
         max_ray_depth: MAX_DEPTH,
-        aspect_ratio: ASPECT_RATIO,
+        aspect_ratio: (IMAGE_WIDTH as Real) / (IMAGE_HEIGHT as Real),
         look_at,
         look_from,
         world_up,
@@ -369,14 +381,15 @@ fn main() -> std::result::Result<(), String> {
     };
 
     let start_time = std::time::Instant::now();
-    let raytraced_pixels = raytrace_mt(params);
+    let raytraced_pixels = raytrace_mt(params, make_random_world2());
     let render_duration = start_time.elapsed();
 
     let minutes = render_duration.as_secs() / 60u64;
     let seconds = (render_duration - std::time::Duration::from_secs(minutes * 60u64)).as_secs();
 
     println!(
-        "Finished! Rendering settings : {:?}\nTotal render time = {} minutes {} seconds",
+        "Finished! Rendering settings : floating point model: {} precision\n{:?}\nTotal render time = {} minutes {} seconds",
+        FP_MODEL,
         params, minutes, seconds
     );
 

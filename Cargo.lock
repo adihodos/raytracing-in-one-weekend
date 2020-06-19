@@ -254,6 +254,8 @@ name = "raytracer"
 version = "0.1.0"
 dependencies = [
  "math",
+ "num",
+ "num-traits",
  "png",
  "rand",
 ]

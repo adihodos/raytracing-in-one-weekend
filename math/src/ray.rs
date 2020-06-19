@@ -1,5 +1,5 @@
 use crate::vec3::TVec3;
-use num_traits::{Float, Num};
+use num_traits::Num;
 
 /// Ray in R3.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
