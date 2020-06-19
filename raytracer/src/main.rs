@@ -19,7 +19,7 @@ use hittable::Hittable;
 use hittable_list::HittableList;
 use lambertian::Lambertian;
 use metal::Metal;
-use objects::{disk::Disk, plane::Plane, sphere::Sphere};
+use objects::{disk::Disk, plane::Plane, sphere::Sphere, triangle::Triangle};
 
 use types::*;
 
@@ -171,11 +171,11 @@ fn make_random_world2() -> HittableList {
     )));
 
     let mut world = HittableList::new();
-    world.add(Arc::new(Plane {
-        origin: Point::same(0 as Real),
-        normal: Vec3::new(0 as Real, 1 as Real, 0 as Real),
-        mtl: ground_mtl,
-    }));
+    world.add(Arc::new(Plane::new(
+        Point::same(0 as Real),
+        Vec3::new(0 as Real, 1 as Real, 0 as Real),
+        ground_mtl,
+    )));
 
     let disk_mtl = Arc::new(Lambertian::new(Color::new(
         0 as Real,
@@ -189,6 +189,18 @@ fn make_random_world2() -> HittableList {
         radius: 0.5 as Real,
         mtl: disk_mtl,
     }));
+
+    let triangle_mtl = Arc::new(Metal::new(
+        Color::new(0 as Real, 0.1 as Real, 0.9 as Real),
+        0.1 as Real,
+    ));
+
+    world.add(Arc::new(Triangle::new(
+        Point::new(-5 as Real, 0 as Real, -1 as Real),
+        Point::new(5 as Real, 0 as Real, -2 as Real),
+        Point::new(0 as Real, 3 as Real, -1 as Real),
+        triangle_mtl,
+    )));
 
     world
 }
