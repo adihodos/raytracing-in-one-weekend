@@ -24,7 +24,7 @@ impl Hittable for Disk {
         }
 
         let a = r.origin - self.origin;
-        let t = -dot(a, self.normal) / dir_dot_normal;
+        let t = dot(a, self.normal) / dir_dot_normal;
 
         if t < t_max && t > t_min {
             let p = r.at(t);
