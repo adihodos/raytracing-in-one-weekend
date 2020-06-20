@@ -12,7 +12,7 @@ pub struct Disk {
 
 impl Hittable for Disk {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
-        use math::vec3::dot;
+        use math::vec3::{dot, length_squared};
 
         let dir_dot_normal = dot(self.normal, r.direction);
         const EPSILON: Real = 1.0E-5 as Real;
@@ -28,7 +28,7 @@ impl Hittable for Disk {
 
         if t < t_max && t > t_min {
             let p = r.at(t);
-            if (p - self.origin).length_squared() <= self.radius * self.radius {
+            if length_squared(p - self.origin) <= self.radius * self.radius {
                 //
                 // intersection point is within the disk
                 Some(HitRecord::new(

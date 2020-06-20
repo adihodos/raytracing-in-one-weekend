@@ -21,12 +21,12 @@ impl Sphere {
 
 impl Hittable for Sphere {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
-        use math::vec3::dot;
+        use math::vec3::{dot, length_squared};
 
         let oc = r.origin - self.center;
-        let a = r.direction.length_squared();
+        let a = length_squared(r.direction);
         let half_b = dot(oc, r.direction);
-        let c = oc.length_squared() - self.radius * self.radius;
+        let c = length_squared(oc) - self.radius * self.radius;
 
         let delta = half_b * half_b - a * c;
 

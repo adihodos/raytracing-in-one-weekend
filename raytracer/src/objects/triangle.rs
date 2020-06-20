@@ -23,6 +23,18 @@ impl Triangle {
     }
 }
 
+impl std::ops::Index<usize> for Triangle {
+    type Output = Point;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.v0,
+            1 => &self.v1,
+            2 => &self.v2,
+            _ => panic!("Index must be in the [0, 2] range"),
+        }
+    }
+}
+
 impl Hittable for Triangle {
     fn hit(&self, ray: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
         use math::vec3::{are_on_the_same_plane_side, cross, dot};
@@ -55,38 +67,21 @@ impl Hittable for Triangle {
 
         //
         // check if the point lies inside the triangle
+        let containment_tests_failed = [(0, 1), (1, 2), (2, 0)].iter().any(|vertex_indices| {
+            // direction vector along the edge
+            let edge_vec = self[vertex_indices.1] - self[vertex_indices.0];
+            // direction vector from the vertex to the intersection point with the ray
+            let intersect_point_vec = p - self[vertex_indices.0];
+            // orthogonal vector to the above two vectors
+            let orthogonal_vec = cross(edge_vec, intersect_point_vec);
 
-        //
-        // Check edge from v0 to v1
+            !are_on_the_same_plane_side(orthogonal_vec, self.normal)
+        });
 
-        // vector along the edge of the triangle
-        let edge_vector = self.v1 - self.v0;
-        // vector from this vertex to the intersection point
-        let vertex_to_point_vector = p - self.v0;
-        // vector perpendicular to the edge and intersection point vector
-        let perp_vector = cross(edge_vector, vertex_to_point_vector);
-
-        if !are_on_the_same_plane_side(perp_vector, self.normal) {
-            return None;
-        }
-
-        //
-        // Check edge from v1 to v2
-        let edge_vector = self.v2 - self.v1;
-        let vertex_to_point_vector = p - self.v1;
-        let perp_vector = cross(edge_vector, vertex_to_point_vector);
-
-        if !are_on_the_same_plane_side(perp_vector, self.normal) {
-            return None;
-        }
-
-        //
-        // Check edge from v2 to v0
-        let edge_vector = self.v0 - self.v2;
-        let vertex_to_point_vector = p - self.v2;
-        let perp_vector = cross(edge_vector, vertex_to_point_vector);
-
-        if !are_on_the_same_plane_side(perp_vector, self.normal) {
+        if containment_tests_failed {
+            //
+            // point is on the plane defined by the triangle's vertices but
+            // outside the triangle
             return None;
         }
 

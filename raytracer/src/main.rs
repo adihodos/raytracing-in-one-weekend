@@ -35,8 +35,8 @@ fn write_png<P: AsRef<std::path::Path>>(
     let pixels_rgb = pixels
         .iter()
         .map(|color| {
-            let (r, g, b) = (*color * (1 as Real / samples_per_pixel as Real))
-                .sqrt() // gamma correct for gamma = 2.0
+            let (r, g, b) = math::vec3::sqrt(*color * (1 as Real / samples_per_pixel as Real))
+                // gamma correct for gamma = 2.0
                 .into();
 
             const COLOR_CLAMP_MIN: Real = 0 as Real;
@@ -76,14 +76,14 @@ fn write_png<P: AsRef<std::path::Path>>(
 
 fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
     if depth <= 0 {
-        return Color::same(0 as Real);
+        return Color::broadcast(0 as Real);
     }
 
     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
             return scatter.attenuation * ray_color(&scatter.ray, world, depth - 1);
         } else {
-            return Color::same(0 as Real);
+            return Color::broadcast(0 as Real);
         }
     }
 
@@ -91,11 +91,12 @@ fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
     let unit_direction = normalize(r.direction);
     let t = 0.5 as Real * (unit_direction.y + 1 as Real);
 
-    (1 as Real - t) * Color::same(1 as Real) + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
+    (1 as Real - t) * Color::broadcast(1 as Real)
+        + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
 }
 
 fn make_random_world() -> HittableList {
-    let ground_material = Arc::new(Lambertian::new(Color::same(0.5 as Real)));
+    let ground_material = Arc::new(Lambertian::new(Color::broadcast(0.5 as Real)));
     let mut world = HittableList::new();
 
     world.add(Arc::new(Sphere::new(
@@ -112,7 +113,9 @@ fn make_random_world() -> HittableList {
                 b as Real + 0.9 as Real * random_real(),
             );
 
-            if (center - Point::new(4 as Real, 0.2 as Real, 0 as Real)).length() > 0.9 as Real {
+            use math::vec3::{length, sqrt};
+
+            if length(center - sqrt(Point::new(4 as Real, 0.2 as Real, 0 as Real))) > 0.9 as Real {
                 use crate::material::Material;
                 let choose_mat = random_real();
 
@@ -172,7 +175,7 @@ fn make_random_world2() -> HittableList {
 
     let mut world = HittableList::new();
     world.add(Arc::new(Plane::new(
-        Point::same(0 as Real),
+        Point::broadcast(0 as Real),
         Vec3::new(0 as Real, 1 as Real, 0 as Real),
         ground_mtl,
     )));
@@ -274,7 +277,7 @@ fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
     use std::sync::Mutex;
     let workblocks = Arc::new(Mutex::new(workblocks));
     let mut image_pixels =
-        vec![Color::same(0 as Real); (params.image_width * params.image_height) as usize];
+        vec![Color::broadcast(0 as Real); (params.image_width * params.image_height) as usize];
 
     let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
 
@@ -308,7 +311,7 @@ fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
                                 //
                                 // Raytrace this pixel
                                 let pixel_color = (0..params.samples_per_pixel).fold(
-                                    Color::same(0 as Real),
+                                    Color::broadcast(0 as Real),
                                     |color, _| {
                                         let u = (x as Real + random_real())
                                             / (params.image_width - 1) as Real;
@@ -363,11 +366,21 @@ fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
 }
 
 fn main() -> std::result::Result<(), String> {
+    // let v = Vec3::new(1 as Real, 2 as Real, 0.5 as Real);
+    let v0 = Vec3::broadcast(-1f32);
+    let v1 = Vec3::broadcast(2f32);
+    let v = math::vec3::min(v0, v1);
+
+    type IVec3 = math::vec3::TVec3<i32>;
+    let v2 = IVec3::broadcast(1);
+    let v3 = IVec3::broadcast(4);
+    let v = math::vec3::min(v2, v3);
+    // let cv = math::vec3::cos(v);
     println!("Floating point precision: {}", FP_MODEL);
     // const ASPECT_RATIO: Real = 16f32 / 9f32;
     const IMAGE_WIDTH: i32 = 1200;
     const IMAGE_HEIGHT: i32 = 800;
-    const SAMPLES_PER_PIXEL: i32 = 16;
+    const SAMPLES_PER_PIXEL: i32 = 256;
     const MAX_DEPTH: i32 = 50;
 
     let look_from = Point::new(13 as Real, 2 as Real, 3 as Real);

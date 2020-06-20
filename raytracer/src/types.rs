@@ -89,7 +89,7 @@ pub fn rand_vec3_range(min: Real, max: Real) -> Vec3 {
 pub fn random_in_unit_sphere() -> Vec3 {
     loop {
         let p = rand_vec3_range(-1 as Real, 1 as Real);
-        if p.length_squared() >= 1 as Real {
+        if math::vec3::length_squared(p) >= 1 as Real {
             continue;
         }
 
@@ -123,7 +123,7 @@ pub fn random_in_unit_disk() -> Vec3 {
             0 as Real,
         );
 
-        if v.length_squared() >= 1 as Real {
+        if math::vec3::length_squared(v) >= 1 as Real {
             continue;
         }
 

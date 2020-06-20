@@ -17,8 +17,40 @@ where
         TVec3 { x, y, z }
     }
 
-    pub fn same(val: T) -> Self {
-        Self::new(val, val, val)
+    /// Set all components to the specified value
+    pub fn broadcast(val: T) -> Self {
+        TVec3 {
+            x: val,
+            y: val,
+            z: val,
+        }
+    }
+
+    /// Set x to specified value, y and z to default (0)
+    pub fn with_x(x: T) -> Self {
+        TVec3 {
+            x,
+            y: T::zero(),
+            z: T::zero(),
+        }
+    }
+
+    /// Set y to specified value, x and z to default (0)
+    pub fn with_y(y: T) -> Self {
+        TVec3 {
+            x: T::zero(),
+            y,
+            z: T::zero(),
+        }
+    }
+
+    /// Set z to specified value, x and y to default (0)
+    pub fn with_z(z: T) -> Self {
+        TVec3 {
+            x: T::zero(),
+            y: T::zero(),
+            z,
+        }
     }
 
     pub fn as_slice(&self) -> &[T] {
@@ -37,27 +69,27 @@ where
         &mut self.x as *mut _
     }
 
-    pub fn length_squared(&self) -> T {
-        self.x * self.x + self.y * self.y + self.z * self.z
-    }
+    // pub fn length_squared(&self) -> T {
+    //     self.x * self.x + self.y * self.y + self.z * self.z
+    // }
 
-    pub fn length(&self) -> T
-    where
-        T: Float + Copy + Clone + std::fmt::Debug,
-    {
-        self.length_squared().sqrt()
-    }
+    // pub fn length(&self) -> T
+    // where
+    //     T: Float + Copy + Clone + std::fmt::Debug,
+    // {
+    //     self.length_squared().sqrt()
+    // }
 
-    pub fn sqrt(&self) -> Self
-    where
-        T: Float + Copy + Clone + std::fmt::Debug,
-    {
-        Self {
-            x: self.x.sqrt(),
-            y: self.y.sqrt(),
-            z: self.z.sqrt(),
-        }
-    }
+    // pub fn sqrt(&self) -> Self
+    // where
+    //     T: Float + Copy + Clone + std::fmt::Debug,
+    // {
+    //     Self {
+    //         x: self.x.sqrt(),
+    //         y: self.y.sqrt(),
+    //         z: self.z.sqrt(),
+    //     }
+    // }
 }
 
 pub mod consts {
@@ -409,12 +441,56 @@ where
     }
 }
 
+pub fn length_squared<T>(v: TVec3<T>) -> T
+where
+    T: Copy + Clone + Num + std::fmt::Debug + std::ops::Mul<Output = T> + std::ops::Add<Output = T>,
+{
+    v.x * v.x + v.y * v.y + v.z * v.z
+}
+
+pub fn length<T>(v: TVec3<T>) -> T
+where
+    T: Copy
+        + Clone
+        + Float
+        + std::fmt::Debug
+        + std::ops::Mul<Output = T>
+        + std::ops::Add<Output = T>,
+{
+    length_squared(v).sqrt()
+}
+
+/// Component-wise squared root.
+pub fn sqrt<T>(v: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Float + std::fmt::Debug,
+{
+    TVec3 {
+        x: v.x.sqrt(),
+        y: v.y.sqrt(),
+        z: v.z.sqrt(),
+    }
+}
+
+/// Component-wise boolean test.
+pub fn test<T, F>(v: TVec3<T>, f: F) -> TVec3<bool>
+where
+    T: Copy + Clone + Num + std::fmt::Debug,
+    F: Fn(T) -> bool,
+{
+    TVec3 {
+        x: f(v.x),
+        y: f(v.y),
+        z: f(v.z),
+    }
+}
+
 /// Make a unit length vector from the input vector.
 pub fn normalize<T>(v: TVec3<T>) -> TVec3<T>
 where
     T: Copy + Clone + Float + std::fmt::Debug,
 {
-    let lensq = v.length_squared();
+    let lensq = length_squared(v);
     if lensq.is_zero() {
         consts::null()
     } else {
@@ -427,7 +503,7 @@ pub fn is_unit_length<T>(v: TVec3<T>) -> bool
 where
     T: Copy + Clone + Num + std::fmt::Debug,
 {
-    v.length_squared().is_one()
+    length_squared(v).is_one()
 }
 
 /// Dot product of two vectors.
@@ -489,7 +565,7 @@ where
 {
     let cos_theta = dot(-uv, n);
     let r_out_parallel = etai_over_etat * (uv + cos_theta * n);
-    let r_out_perp = -(T::one() - r_out_parallel.length_squared()).sqrt() * n;
+    let r_out_perp = -(T::one() - length_squared(r_out_parallel)).sqrt() * n;
     r_out_parallel + r_out_perp
 }
 
@@ -498,14 +574,14 @@ pub fn are_parallel<T>(a: TVec3<T>, b: TVec3<T>) -> bool
 where
     T: Copy + Clone + Num + std::ops::Mul + std::ops::Add + std::ops::Sub + std::fmt::Debug,
 {
-    cross(a, b).length_squared().is_zero()
+    length_squared(cross(a, b)).is_zero()
 }
 
 pub fn angle_between<T>(a: TVec3<T>, b: TVec3<T>) -> T
 where
     T: Copy + Clone + Float + std::fmt::Debug,
 {
-    (dot(a, b) / (a.length() * b.length())).acos()
+    (dot(a, b) / (length(a) * length(b))).acos()
 }
 
 /// Test if two vectors are on the same side of a half-space defined by a plane.
@@ -521,4 +597,172 @@ where
         + std::cmp::PartialOrd,
 {
     dot(a, b) > T::zero()
+}
+
+fn transform<T, F>(vec: TVec3<T>, f: F) -> TVec3<T>
+where
+    T: Copy + Clone,
+    F: Fn(T) -> T,
+{
+    TVec3 {
+        x: f(vec.x),
+        y: f(vec.y),
+        z: f(vec.z),
+    }
+}
+
+pub fn sin<T>(angle: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Float + std::fmt::Debug,
+{
+    transform(angle, |x| x.sin())
+}
+
+pub fn cos<T>(angle: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Float + std::fmt::Debug,
+{
+    transform(angle, |x| x.cos())
+}
+
+pub fn tan<T>(angle: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Float + std::fmt::Debug,
+{
+    transform(angle, |x| x.tan())
+}
+
+pub fn abs<T>(val: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + num::Signed,
+{
+    transform(val, |x| x.abs())
+}
+
+pub fn sign<T>(val: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + num::Signed + std::cmp::PartialOrd,
+{
+    transform(val, |x| if x < T::zero() { -T::one() } else { T::one() })
+}
+
+pub fn min_sv<T>(a: TVec3<T>, b: T) -> TVec3<T>
+where
+    T: Copy + Clone + Num + crate::minmax::MinMax<Output = T>,
+{
+    TVec3 {
+        x: T::min(a.x, b),
+        y: T::min(a.y, b),
+        z: T::min(a.z, b),
+    }
+}
+
+pub fn min<T>(a: TVec3<T>, b: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Num + crate::minmax::MinMax<Output = T>,
+{
+    TVec3 {
+        x: T::min(a.x, b.x),
+        y: T::min(a.y, b.y),
+        z: T::min(a.z, b.z),
+    }
+}
+
+pub fn max_sv<T>(a: TVec3<T>, b: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Num + crate::minmax::MinMax<Output = T>,
+{
+    TVec3 {
+        x: T::max(a.x, b.x),
+        y: T::max(a.y, b.y),
+        z: T::max(a.z, b.z),
+    }
+}
+
+pub fn max<T>(a: TVec3<T>, b: T) -> TVec3<T>
+where
+    T: Copy + Clone + Num + crate::minmax::MinMax<Output = T>,
+{
+    TVec3 {
+        x: T::max(a.x, b),
+        y: T::max(a.y, b),
+        z: T::max(a.z, b),
+    }
+}
+
+pub fn clamp<T>(a: TVec3<T>, minval: TVec3<T>, maxval: TVec3<T>) -> TVec3<T>
+where
+    T: Copy + Clone + Num + crate::minmax::MinMax<Output = T>,
+{
+    TVec3 {
+        x: T::min(T::max(a.x, minval.x), maxval.x),
+        y: T::min(T::max(a.y, minval.y), maxval.y),
+        z: T::min(T::max(a.z, minval.z), maxval.z),
+    }
+}
+
+pub fn clamp_sv<T>(a: TVec3<T>, minval: T, maxval: T) -> TVec3<T>
+where
+    T: Copy + Clone + Num + crate::minmax::MinMax<Output = T>,
+{
+    TVec3 {
+        x: T::min(T::max(a.x, minval), maxval),
+        y: T::min(T::max(a.y, minval), maxval),
+        z: T::min(T::max(a.z, minval), maxval),
+    }
+}
+
+/// Returns the linear blend of x and y, i.e., x · (1 - a) + y · a
+pub fn mix<T>(x: TVec3<T>, y: TVec3<T>, a: TVec3<T>) -> TVec3<T>
+where
+    T: Copy
+        + Clone
+        + Num
+        + std::ops::Add<Output = T>
+        + std::ops::Sub<Output = T>
+        + std::ops::Mul<Output = T>,
+{
+    TVec3 {
+        x: (T::one() - a.x) * x.x + a.x * y.x,
+        y: (T::one() - a.y) * x.y + a.y * y.y,
+        z: (T::one() - a.z) * x.z + a.z * y.z,
+    }
+}
+
+/// Returns the linear blend of x and y, i.e., x · (1 - a) + y · a
+pub fn mix_sv<T>(x: TVec3<T>, y: TVec3<T>, a: T) -> TVec3<T>
+where
+    T: Copy
+        + Clone
+        + Num
+        + std::ops::Add<Output = T>
+        + std::ops::Sub<Output = T>
+        + std::ops::Mul<Output = T>,
+{
+    TVec3 {
+        x: (T::one() - a) * x.x + a * y.x,
+        y: (T::one() - a) * x.y + a * y.y,
+        z: (T::one() - a) * x.z + a * y.z,
+    }
+}
+
+/// Selects which vector each returned component
+/// comes from. For a component of a that is false,
+/// the corresponding component of x is returned.
+/// For a component of a that is true, the
+/// corresponding component of y is returned.
+pub fn bmix<T>(x: TVec3<T>, y: TVec3<T>, a: TVec3<bool>) -> TVec3<T>
+where
+    T: Copy
+        + Clone
+        + Num
+        + std::ops::Add<Output = T>
+        + std::ops::Sub<Output = T>
+        + std::ops::Mul<Output = T>,
+{
+    TVec3 {
+        x: if a.x { x.x } else { y.x },
+        y: if a.y { x.y } else { y.y },
+        z: if a.z { x.z } else { y.z },
+    }
 }
