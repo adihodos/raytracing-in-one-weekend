@@ -7,6 +7,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+mod ui;
+
 mod camera;
 mod dielectric;
 mod generic_handle;
@@ -31,6 +33,7 @@ use rendering::gl;
 use types::*;
 
 use glfw::Context;
+use ui::UiBackend;
 
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
@@ -251,142 +254,6 @@ struct ImageOutput {
 unsafe impl std::marker::Send for ImageOutput {}
 unsafe impl std::marker::Sync for ImageOutput {}
 
-// fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
-//     const WORKER_BLOCK_DIM: i32 = 16;
-
-//     let blocks_x = (params.image_width / WORKER_BLOCK_DIM) + 1;
-//     let blocks_y = (params.image_height / WORKER_BLOCK_DIM) + 1;
-
-//     let mut workblocks = vec![];
-//     (0..blocks_y).for_each(|yblk| {
-//         (0..blocks_x).for_each(|xblk| {
-//             workblocks.push(WorkBlock {
-//                 xdim: (
-//                     (xblk * WORKER_BLOCK_DIM).min(params.image_width),
-//                     ((xblk + 1) * WORKER_BLOCK_DIM).min(params.image_width),
-//                 ),
-//                 ydim: (
-//                     (yblk * WORKER_BLOCK_DIM).min(params.image_height),
-//                     ((yblk + 1) * WORKER_BLOCK_DIM).min(params.image_height),
-//                 ),
-//             });
-//         });
-//     });
-
-//     let cam = camera::Camera::new(
-//         params.look_from,
-//         params.look_at,
-//         params.world_up,
-//         params.vertical_fov,
-//         params.aspect_ratio,
-//         params.aperture,
-//         params.focus_dist,
-//     );
-
-//     let total_workblocks = workblocks.len();
-//     let world = Arc::new(world);
-//     use std::sync::Mutex;
-//     let workblocks = Arc::new(Mutex::new(workblocks));
-//     let mut image_pixels =
-//         vec![Color::broadcast(0 as Real); (params.image_width * params.image_height) as usize];
-
-//     let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
-
-//     let workers = (0..params.workers)
-//         .map(|worker_idx| {
-//             let workblocks = Arc::clone(&workblocks);
-//             let world = Arc::clone(&world);
-//             let output_pixels = ImageOutput {
-//                 pixels: image_pixels.as_mut_ptr(),
-//                 width: params.image_width,
-//                 height: params.image_height,
-//             };
-//             let workblocks_done = Arc::clone(&workblocks_done);
-
-//             std::thread::spawn(move || loop {
-//                 //
-//                 // pop a work package from the queue
-//                 let maybe_this_work_pkg = if let Ok(ref mut work_queue) = workblocks.lock() {
-//                     work_queue.pop()
-//                 } else {
-//                     None
-//                 };
-
-//                 if let Some(this_work_pkg) = maybe_this_work_pkg {
-//                     //
-//                     // process pixels in this work package
-//                     (this_work_pkg.ydim.0..this_work_pkg.ydim.1)
-//                         .rev()
-//                         .for_each(|y| {
-//                             (this_work_pkg.xdim.0..this_work_pkg.xdim.1).for_each(|x| {
-//                                 //
-//                                 // Raytrace this pixel
-//                                 let pixel_color = (0..params.samples_per_pixel).fold(
-//                                     Color::broadcast(0 as Real),
-//                                     |color, _| {
-//                                         let u = (x as Real + random_real())
-//                                             / (params.image_width - 1) as Real;
-//                                         let v = 1 as Real
-//                                             - (y as Real + random_real())
-//                                                 / (params.image_height - 1) as Real;
-//                                         let r = cam.get_ray(u, v);
-//                                         color + ray_color(&r, &world, params.max_ray_depth)
-//                                     },
-//                                 );
-
-//                                 //
-//                                 // gamma correct
-//                                 let pixel_color = math::vec3::clamp(
-//                                     math::vec3::sqrt(
-//                                         pixel_color
-//                                             * (1 as Real / params.samples_per_pixel as Real),
-//                                     ),
-//                                     Vec3::broadcast(COLOR_CLAMP_MIN),
-//                                     Vec3::broadcast(COLOR_CLAMP_MAX),
-//                                 );
-
-//                                 unsafe {
-//                                     output_pixels
-//                                         .pixels
-//                                         .add((y * params.image_width + x) as usize)
-//                                         .write(pixel_color);
-//                                 }
-//                             });
-//                         });
-
-//                     workblocks_done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-//                 } else {
-//                     println!(
-//                         "No more work or queue locking failure, worker {} quitting ...",
-//                         worker_idx
-//                     );
-//                     break;
-//                 }
-//             })
-//         })
-//         .collect::<Vec<_>>();
-
-//     loop {
-//         let processed = workblocks_done.load(std::sync::atomic::Ordering::SeqCst);
-//         println!(
-//             "Processed {} workblocks out of {} total",
-//             processed, total_workblocks
-//         );
-
-//         if processed == total_workblocks as i32 {
-//             break;
-//         }
-
-//         std::thread::sleep(std::time::Duration::from_millis(200));
-//     }
-
-//     workers
-//         .into_iter()
-//         .for_each(|w| w.join().expect("Failed to join worker!"));
-
-//     image_pixels
-// }
-
 struct RaytracerState {
     params: RaytracerParams,
     workers: Vec<std::thread::JoinHandle<()>>,
@@ -394,6 +261,7 @@ struct RaytracerState {
     total_workblocks: u32,
     image_pixels: Vec<Color>,
     cancel_token: Arc<std::sync::atomic::AtomicBool>,
+    start_time: std::time::Instant,
 }
 
 impl std::ops::Drop for RaytracerState {
@@ -416,8 +284,6 @@ impl RaytracerState {
 
     fn new() -> RaytracerState {
         let params = Self::load_parameters();
-
-        // const WORKER_BLOCK_DIM: i32 = ;
 
         let blocks_x = (params.image_width / params.worker_block_pixels) + 1;
         let blocks_y = (params.image_height / params.worker_block_pixels) + 1;
@@ -548,6 +414,7 @@ impl RaytracerState {
             workblocks_done,
             image_pixels,
             cancel_token,
+            start_time: std::time::Instant::now(),
         }
     }
 
@@ -587,10 +454,10 @@ impl RaytracerState {
 struct Main {
     raytracer: RaytracerState,
     rtgl: RaytracingGlState,
+    ui: UiBackend,
     glfw: glfw::Glfw,
     window: glfw::Window,
     events: Receiver<(f64, glfw::WindowEvent)>,
-    start_time: std::time::Instant,
 }
 
 impl Main {
@@ -619,6 +486,7 @@ impl Main {
 
         rendering::gl::load_with(|s| window.get_proc_address(s) as *const _);
 
+        let ui = UiBackend::new(&window);
         let raytracer = RaytracerState::new();
         let rtgl = RaytracingGlState::new(
             raytracer.params.image_width as u32,
@@ -626,12 +494,12 @@ impl Main {
         );
 
         Main {
+            ui,
             raytracer,
             rtgl,
             glfw,
             window,
             events,
-            start_time: std::time::Instant::now(),
         }
     }
 
@@ -657,8 +525,51 @@ impl Main {
                 self.window.set_should_close(true);
                 self.raytracer.cancel_work();
             }
-            _ => {}
+
+            _ => {
+                self.ui.event_handler(&self.window, event);
+            }
         }
+    }
+
+    fn draw_ui(&mut self) {
+        let ui = self.ui.new_frame(&self.window);
+        let p = self.raytracer.params;
+        let work_done = self
+            .raytracer
+            .workblocks_done
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let total_work = self.raytracer.total_workblocks;
+        let elapsed = self.raytracer.start_time.elapsed();
+
+        ui.window("Raytracer status")
+            .size([400f32, 600f32], imgui::Condition::FirstUseEver)
+            .build(|| {
+                ui.text(format!("Image size: {}x{}", p.image_width, p.image_height));
+                ui.text(format!("Aspect ratio: {}", p.aspect_ratio));
+                ui.text(format!("Aperture: {}", p.aperture));
+                ui.text(format!("Focus distance: {}", p.focus_dist));
+                ui.text(format!("Maximum ray depth: {}", p.max_ray_depth));
+                ui.text(format!("Samples per pixel: {}", p.samples_per_pixel));
+                ui.text(format!("Field of view: {}", p.vertical_fov));
+
+                ui.separator();
+                ui.text(format!("Worker threads: {}", p.workers));
+
+                ui.separator();
+                imgui::ProgressBar::new(work_done as f32 / total_work as f32)
+                    .overlay_text(format!(
+                        "Pixels raytraced {}/{}",
+                        p.worker_block_pixels * p.worker_block_pixels * work_done,
+                        p.image_width * p.image_height
+                    ))
+                    .build(&ui);
+
+                ui.text_colored(
+                    [1f32, 0f32, 0f32, 1f32],
+                    format!("Time spent: {}", humantime::format_duration(elapsed)),
+                );
+            });
     }
 
     fn update_loop(&mut self) {
@@ -678,6 +589,11 @@ impl Main {
             self.rtgl.update_texture(self.raytracer.get_image_pixels());
         }
         self.rtgl.render(&frame_context);
+
+        //
+        // render ui
+        self.draw_ui();
+        self.ui.render();
     }
 }
 

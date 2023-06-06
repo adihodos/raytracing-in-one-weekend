@@ -20,3 +20,4 @@ version = "0.1.0"
     imgui = "0.11.0"
     serde = { version = "*", features = ["derive"] }
     ron = "*"
+    humantime = "*"
