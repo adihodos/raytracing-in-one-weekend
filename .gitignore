@@ -1,6 +1,5 @@
 /target
 /*.vscode
 *.ppm
-*.png
 *.svg
 perf.data

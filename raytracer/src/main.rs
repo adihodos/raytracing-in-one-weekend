@@ -406,7 +406,7 @@ fn main() -> std::result::Result<(), String> {
     };
 
     let start_time = std::time::Instant::now();
-    let raytraced_pixels = raytrace_mt(params, make_random_world2());
+    let raytraced_pixels = raytrace_mt(params, make_random_world());
     let render_duration = start_time.elapsed();
 
     let minutes = render_duration.as_secs() / 60u64;
