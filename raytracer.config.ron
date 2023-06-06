@@ -1,0 +1,15 @@
+(
+    workers: 8,
+    aspect_ratio: 1.5,
+    image_width: 1200,
+    image_height: 800,
+    samples_per_pixel: 32,
+    max_ray_depth: 50,
+    vertical_fov: 20.0,
+    look_from: (13.0, 2.0, 3.0),
+    look_at: (0.0, 0.0, 0.0),
+    world_up: (0.0, 1.0, 0.0),
+    aperture: 0.1,
+    focus_dist: 10.0,
+    shuffle_workblocks: true,
+)

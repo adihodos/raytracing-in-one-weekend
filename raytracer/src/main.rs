@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
+use std::{
+    os::raw::c_void,
+    sync::{mpsc::Receiver, Arc},
+};
+
+use serde::{Deserialize, Serialize};
 
 mod camera;
 mod dielectric;
@@ -21,7 +26,14 @@ use lambertian::Lambertian;
 use metal::Metal;
 use objects::{disk::Disk, plane::Plane, sphere::Sphere, triangle::Triangle};
 
+use rand::seq::SliceRandom;
+use rendering::gl;
 use types::*;
+
+use glfw::Context;
+
+const COLOR_CLAMP_MIN: Real = 0 as Real;
+const COLOR_CLAMP_MAX: Real = 0.999 as Real;
 
 fn write_png<P: AsRef<std::path::Path>>(
     file_path: P,
@@ -38,9 +50,6 @@ fn write_png<P: AsRef<std::path::Path>>(
             let (r, g, b) = math::vec3::sqrt(*color * (1 as Real / samples_per_pixel as Real))
                 // gamma correct for gamma = 2.0
                 .into();
-
-            const COLOR_CLAMP_MIN: Real = 0 as Real;
-            const COLOR_CLAMP_MAX: Real = 0.999 as Real;
 
             (
                 (256 as Real * clamp(r, COLOR_CLAMP_MIN, COLOR_CLAMP_MAX)) as u8,
@@ -208,20 +217,22 @@ fn make_random_world2() -> HittableList {
     world
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct RaytracerParams {
     workers: i32,
+    worker_block_pixels: i32,
     aspect_ratio: Real,
     image_width: i32,
     image_height: i32,
     samples_per_pixel: i32,
     max_ray_depth: i32,
     vertical_fov: Real,
-    look_from: Point,
-    look_at: Point,
-    world_up: Vec3,
+    look_from: [Real; 3],
+    look_at: [Real; 3],
+    world_up: [Real; 3],
     aperture: Real,
     focus_dist: Real,
+    shuffle_workblocks: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -240,192 +251,612 @@ struct ImageOutput {
 unsafe impl std::marker::Send for ImageOutput {}
 unsafe impl std::marker::Sync for ImageOutput {}
 
-fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
-    const WORKER_BLOCK_DIM: i32 = 16;
+// fn raytrace_mt(params: RaytracerParams, world: HittableList) -> Vec<Color> {
+//     const WORKER_BLOCK_DIM: i32 = 16;
 
-    let blocks_x = (params.image_width / WORKER_BLOCK_DIM) + 1;
-    let blocks_y = (params.image_height / WORKER_BLOCK_DIM) + 1;
+//     let blocks_x = (params.image_width / WORKER_BLOCK_DIM) + 1;
+//     let blocks_y = (params.image_height / WORKER_BLOCK_DIM) + 1;
 
-    let mut workblocks = vec![];
-    (0..blocks_y).for_each(|yblk| {
-        (0..blocks_x).for_each(|xblk| {
-            workblocks.push(WorkBlock {
-                xdim: (
-                    (xblk * WORKER_BLOCK_DIM).min(params.image_width),
-                    ((xblk + 1) * WORKER_BLOCK_DIM).min(params.image_width),
-                ),
-                ydim: (
-                    (yblk * WORKER_BLOCK_DIM).min(params.image_height),
-                    ((yblk + 1) * WORKER_BLOCK_DIM).min(params.image_height),
-                ),
-            });
+//     let mut workblocks = vec![];
+//     (0..blocks_y).for_each(|yblk| {
+//         (0..blocks_x).for_each(|xblk| {
+//             workblocks.push(WorkBlock {
+//                 xdim: (
+//                     (xblk * WORKER_BLOCK_DIM).min(params.image_width),
+//                     ((xblk + 1) * WORKER_BLOCK_DIM).min(params.image_width),
+//                 ),
+//                 ydim: (
+//                     (yblk * WORKER_BLOCK_DIM).min(params.image_height),
+//                     ((yblk + 1) * WORKER_BLOCK_DIM).min(params.image_height),
+//                 ),
+//             });
+//         });
+//     });
+
+//     let cam = camera::Camera::new(
+//         params.look_from,
+//         params.look_at,
+//         params.world_up,
+//         params.vertical_fov,
+//         params.aspect_ratio,
+//         params.aperture,
+//         params.focus_dist,
+//     );
+
+//     let total_workblocks = workblocks.len();
+//     let world = Arc::new(world);
+//     use std::sync::Mutex;
+//     let workblocks = Arc::new(Mutex::new(workblocks));
+//     let mut image_pixels =
+//         vec![Color::broadcast(0 as Real); (params.image_width * params.image_height) as usize];
+
+//     let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
+
+//     let workers = (0..params.workers)
+//         .map(|worker_idx| {
+//             let workblocks = Arc::clone(&workblocks);
+//             let world = Arc::clone(&world);
+//             let output_pixels = ImageOutput {
+//                 pixels: image_pixels.as_mut_ptr(),
+//                 width: params.image_width,
+//                 height: params.image_height,
+//             };
+//             let workblocks_done = Arc::clone(&workblocks_done);
+
+//             std::thread::spawn(move || loop {
+//                 //
+//                 // pop a work package from the queue
+//                 let maybe_this_work_pkg = if let Ok(ref mut work_queue) = workblocks.lock() {
+//                     work_queue.pop()
+//                 } else {
+//                     None
+//                 };
+
+//                 if let Some(this_work_pkg) = maybe_this_work_pkg {
+//                     //
+//                     // process pixels in this work package
+//                     (this_work_pkg.ydim.0..this_work_pkg.ydim.1)
+//                         .rev()
+//                         .for_each(|y| {
+//                             (this_work_pkg.xdim.0..this_work_pkg.xdim.1).for_each(|x| {
+//                                 //
+//                                 // Raytrace this pixel
+//                                 let pixel_color = (0..params.samples_per_pixel).fold(
+//                                     Color::broadcast(0 as Real),
+//                                     |color, _| {
+//                                         let u = (x as Real + random_real())
+//                                             / (params.image_width - 1) as Real;
+//                                         let v = 1 as Real
+//                                             - (y as Real + random_real())
+//                                                 / (params.image_height - 1) as Real;
+//                                         let r = cam.get_ray(u, v);
+//                                         color + ray_color(&r, &world, params.max_ray_depth)
+//                                     },
+//                                 );
+
+//                                 //
+//                                 // gamma correct
+//                                 let pixel_color = math::vec3::clamp(
+//                                     math::vec3::sqrt(
+//                                         pixel_color
+//                                             * (1 as Real / params.samples_per_pixel as Real),
+//                                     ),
+//                                     Vec3::broadcast(COLOR_CLAMP_MIN),
+//                                     Vec3::broadcast(COLOR_CLAMP_MAX),
+//                                 );
+
+//                                 unsafe {
+//                                     output_pixels
+//                                         .pixels
+//                                         .add((y * params.image_width + x) as usize)
+//                                         .write(pixel_color);
+//                                 }
+//                             });
+//                         });
+
+//                     workblocks_done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+//                 } else {
+//                     println!(
+//                         "No more work or queue locking failure, worker {} quitting ...",
+//                         worker_idx
+//                     );
+//                     break;
+//                 }
+//             })
+//         })
+//         .collect::<Vec<_>>();
+
+//     loop {
+//         let processed = workblocks_done.load(std::sync::atomic::Ordering::SeqCst);
+//         println!(
+//             "Processed {} workblocks out of {} total",
+//             processed, total_workblocks
+//         );
+
+//         if processed == total_workblocks as i32 {
+//             break;
+//         }
+
+//         std::thread::sleep(std::time::Duration::from_millis(200));
+//     }
+
+//     workers
+//         .into_iter()
+//         .for_each(|w| w.join().expect("Failed to join worker!"));
+
+//     image_pixels
+// }
+
+struct RaytracerState {
+    params: RaytracerParams,
+    workers: Vec<std::thread::JoinHandle<()>>,
+    workblocks_done: std::sync::Arc<std::sync::atomic::AtomicI32>,
+    total_workblocks: u32,
+    image_pixels: Vec<Color>,
+    cancel_token: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl std::ops::Drop for RaytracerState {
+    fn drop(&mut self) {
+        let mut workers = Vec::new();
+        std::mem::swap(&mut self.workers, &mut workers);
+        workers.into_iter().for_each(|w| {
+            w.join().expect("Failed to join worker!");
         });
-    });
+    }
+}
 
-    let cam = camera::Camera::new(
-        params.look_from,
-        params.look_at,
-        params.world_up,
-        params.vertical_fov,
-        params.aspect_ratio,
-        params.aperture,
-        params.focus_dist,
-    );
+impl RaytracerState {
+    fn load_parameters() -> RaytracerParams {
+        let f = std::fs::File::open("data/config/raytracer.config.ron")
+            .expect("Failed to open config file");
 
-    let total_workblocks = workblocks.len();
-    let world = Arc::new(world);
-    use std::sync::Mutex;
-    let workblocks = Arc::new(Mutex::new(workblocks));
-    let mut image_pixels =
-        vec![Color::broadcast(0 as Real); (params.image_width * params.image_height) as usize];
-
-    let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
-
-    let workers = (0..params.workers)
-        .map(|worker_idx| {
-            let workblocks = Arc::clone(&workblocks);
-            let world = Arc::clone(&world);
-            let output_pixels = ImageOutput {
-                pixels: image_pixels.as_mut_ptr(),
-                width: params.image_width,
-                height: params.image_height,
-            };
-            let workblocks_done = Arc::clone(&workblocks_done);
-
-            std::thread::spawn(move || loop {
-                //
-                // pop a work package from the queue
-                let maybe_this_work_pkg = if let Ok(ref mut work_queue) = workblocks.lock() {
-                    work_queue.pop()
-                } else {
-                    None
-                };
-
-                if let Some(this_work_pkg) = maybe_this_work_pkg {
-                    //
-                    // process pixels in this work package
-                    (this_work_pkg.ydim.0..this_work_pkg.ydim.1)
-                        .rev()
-                        .for_each(|y| {
-                            (this_work_pkg.xdim.0..this_work_pkg.xdim.1).for_each(|x| {
-                                //
-                                // Raytrace this pixel
-                                let pixel_color = (0..params.samples_per_pixel).fold(
-                                    Color::broadcast(0 as Real),
-                                    |color, _| {
-                                        let u = (x as Real + random_real())
-                                            / (params.image_width - 1) as Real;
-                                        let v = 1 as Real
-                                            - (y as Real + random_real())
-                                                / (params.image_height - 1) as Real;
-                                        let r = cam.get_ray(u, v);
-                                        color + ray_color(&r, &world, params.max_ray_depth)
-                                    },
-                                );
-
-                                unsafe {
-                                    output_pixels
-                                        .pixels
-                                        .add((y * params.image_width + x) as usize)
-                                        .write(pixel_color);
-                                }
-                            });
-                        });
-
-                    workblocks_done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                } else {
-                    println!(
-                        "No more work or queue locking failure, worker {} quitting ...",
-                        worker_idx
-                    );
-                    break;
-                }
-            })
-        })
-        .collect::<Vec<_>>();
-
-    loop {
-        let processed = workblocks_done.load(std::sync::atomic::Ordering::SeqCst);
-        println!(
-            "Processed {} workblocks out of {} total",
-            processed, total_workblocks
-        );
-
-        if processed == total_workblocks as i32 {
-            break;
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        ron::de::from_reader(f).expect("Failed to decode config file")
     }
 
-    workers
-        .into_iter()
-        .for_each(|w| w.join().expect("Failed to join worker!"));
+    fn new() -> RaytracerState {
+        let params = Self::load_parameters();
 
-    image_pixels
+        // const WORKER_BLOCK_DIM: i32 = ;
+
+        let blocks_x = (params.image_width / params.worker_block_pixels) + 1;
+        let blocks_y = (params.image_height / params.worker_block_pixels) + 1;
+
+        let mut workblocks = vec![];
+        (0..blocks_y).for_each(|yblk| {
+            (0..blocks_x).for_each(|xblk| {
+                workblocks.push(WorkBlock {
+                    xdim: (
+                        (xblk * params.worker_block_pixels).min(params.image_width),
+                        ((xblk + 1) * params.worker_block_pixels).min(params.image_width),
+                    ),
+                    ydim: (
+                        (yblk * params.worker_block_pixels).min(params.image_height),
+                        ((yblk + 1) * params.worker_block_pixels).min(params.image_height),
+                    ),
+                });
+            });
+        });
+
+        if params.shuffle_workblocks {
+            workblocks.shuffle(&mut rand::thread_rng());
+        }
+
+        let cam = camera::Camera::new(
+            params.look_from.into(),
+            params.look_at.into(),
+            params.world_up.into(),
+            params.vertical_fov,
+            params.aspect_ratio,
+            params.aperture,
+            params.focus_dist,
+        );
+
+        let total_workblocks = workblocks.len() as u32;
+        let world = Arc::new(make_random_world());
+        use std::sync::Mutex;
+        let workblocks = Arc::new(Mutex::new(workblocks));
+        let mut image_pixels =
+            vec![Color::broadcast(0 as Real); (params.image_width * params.image_height) as usize];
+
+        let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
+        let cancel_token = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        let workers = (0..params.workers)
+            .map(|worker_idx| {
+                let workblocks = Arc::clone(&workblocks);
+                let world = Arc::clone(&world);
+                let output_pixels = ImageOutput {
+                    pixels: image_pixels.as_mut_ptr(),
+                    width: params.image_width,
+                    height: params.image_height,
+                };
+                let workblocks_done = Arc::clone(&workblocks_done);
+                let cancel_token = Arc::clone(&cancel_token);
+
+                std::thread::spawn(move || loop {
+                    if cancel_token.load(std::sync::atomic::Ordering::SeqCst) {
+                        println!("Worker {} cancelled", worker_idx);
+                        break;
+                    }
+                    //
+                    // pop a work package from the queue
+                    let maybe_this_work_pkg = if let Ok(ref mut work_queue) = workblocks.lock() {
+                        work_queue.pop()
+                    } else {
+                        None
+                    };
+
+                    if let Some(this_work_pkg) = maybe_this_work_pkg {
+                        //
+                        // process pixels in this work package
+                        (this_work_pkg.ydim.0..this_work_pkg.ydim.1)
+                            .rev()
+                            .for_each(|y| {
+                                (this_work_pkg.xdim.0..this_work_pkg.xdim.1).for_each(|x| {
+                                    //
+                                    // Raytrace this pixel
+                                    let pixel_color = (0..params.samples_per_pixel).fold(
+                                        Color::broadcast(0 as Real),
+                                        |color, _| {
+                                            let u = (x as Real + random_real())
+                                                / (params.image_width - 1) as Real;
+                                            let v = 1 as Real
+                                                - (y as Real + random_real())
+                                                    / (params.image_height - 1) as Real;
+                                            let r = cam.get_ray(u, v);
+                                            color + ray_color(&r, &world, params.max_ray_depth)
+                                        },
+                                    );
+
+                                    //
+                                    // gamma correct
+                                    let pixel_color = math::vec3::clamp(
+                                        math::vec3::sqrt(
+                                            pixel_color
+                                                * (1 as Real / params.samples_per_pixel as Real),
+                                        ),
+                                        Vec3::broadcast(COLOR_CLAMP_MIN),
+                                        Vec3::broadcast(COLOR_CLAMP_MAX),
+                                    );
+
+                                    unsafe {
+                                        output_pixels
+                                            .pixels
+                                            .add((y * params.image_width + x) as usize)
+                                            .write(pixel_color);
+                                    }
+                                });
+                            });
+
+                        workblocks_done.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    } else {
+                        println!(
+                            "No more work or queue locking failure, worker {} quitting ...",
+                            worker_idx
+                        );
+                        break;
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        RaytracerState {
+            total_workblocks,
+            params,
+            workers,
+            workblocks_done,
+            image_pixels,
+            cancel_token,
+        }
+    }
+
+    fn get_image_pixels(&self) -> &[f32] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.image_pixels.as_ptr() as *const f32,
+                self.image_pixels.len() * 3,
+            )
+        }
+    }
+
+    fn raytracing_finished(&mut self) -> bool {
+        let is_finished = self
+            .workblocks_done
+            .load(std::sync::atomic::Ordering::SeqCst)
+            > self.total_workblocks as i32;
+
+        if self
+            .workblocks_done
+            .load(std::sync::atomic::Ordering::SeqCst)
+            == self.total_workblocks as i32
+        {
+            self.workblocks_done
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        is_finished
+    }
+
+    fn cancel_work(&mut self) {
+        self.cancel_token
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+struct Main {
+    raytracer: RaytracerState,
+    rtgl: RaytracingGlState,
+    glfw: glfw::Glfw,
+    window: glfw::Window,
+    events: Receiver<(f64, glfw::WindowEvent)>,
+    start_time: std::time::Instant,
+}
+
+impl Main {
+    fn new() -> Main {
+        let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).expect("Failed to initialize GLFW");
+
+        use glfw::WindowHint;
+        glfw.window_hint(WindowHint::DoubleBuffer(true));
+        glfw.window_hint(WindowHint::OpenGlDebugContext(true));
+        glfw.window_hint(WindowHint::OpenGlForwardCompat(true));
+        glfw.window_hint(WindowHint::ClientApi(glfw::ClientApiHint::OpenGl));
+        glfw.window_hint(WindowHint::ContextVersion(4, 6));
+        glfw.window_hint(WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+
+        let (mut window, events) = glfw
+            .create_window(
+                1600,
+                1200,
+                "Raytracing in 1 weekend",
+                glfw::WindowMode::Windowed,
+            )
+            .expect("Failed to create window");
+
+        window.set_all_polling(true);
+        window.make_current();
+
+        rendering::gl::load_with(|s| window.get_proc_address(s) as *const _);
+
+        let raytracer = RaytracerState::new();
+        let rtgl = RaytracingGlState::new(
+            raytracer.params.image_width as u32,
+            raytracer.params.image_height as u32,
+        );
+
+        Main {
+            raytracer,
+            rtgl,
+            glfw,
+            window,
+            events,
+            start_time: std::time::Instant::now(),
+        }
+    }
+
+    fn main_loop(&mut self) {
+        while !self.window.should_close() {
+            self.glfw.poll_events();
+
+            while let Ok((_, event)) = self.events.try_recv() {
+                self.handle_window_event(event);
+            }
+
+            self.update_loop();
+            self.window.swap_buffers();
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    fn handle_window_event(&mut self, event: glfw::WindowEvent) {
+        use glfw::WindowEvent;
+
+        match event {
+            WindowEvent::Close => {
+                self.window.set_should_close(true);
+                self.raytracer.cancel_work();
+            }
+            _ => {}
+        }
+    }
+
+    fn update_loop(&mut self) {
+        let (width, height) = self.window.get_framebuffer_size();
+
+        unsafe {
+            gl::ClearNamedFramebufferfv(0, gl::COLOR, 0, [0f32, 1f32, 0f32, 1f32].as_ptr());
+            gl::ViewportIndexedf(0, 0f32, 0f32, width as f32, height as f32);
+        }
+
+        let frame_context = FrameRenderContext {
+            framebuffer_width: width,
+            framebuffer_height: height,
+        };
+
+        if !self.raytracer.raytracing_finished() {
+            self.rtgl.update_texture(self.raytracer.get_image_pixels());
+        }
+        self.rtgl.render(&frame_context);
+    }
 }
 
 fn main() -> std::result::Result<(), String> {
-    // let v = Vec3::new(1 as Real, 2 as Real, 0.5 as Real);
-    let v0 = Vec3::broadcast(-1f32);
-    let v1 = Vec3::broadcast(2f32);
-    let v = math::vec3::min(v0, v1);
+    // let start_time = std::time::Instant::now();
+    // let raytraced_pixels = raytrace_mt(params, make_random_world());
+    // let render_duration = start_time.elapsed();
 
-    type IVec3 = math::vec3::TVec3<i32>;
-    let v2 = IVec3::broadcast(1);
-    let v3 = IVec3::broadcast(4);
-    let v = math::vec3::min(v2, v3);
-    // let cv = math::vec3::cos(v);
-    println!("Floating point precision: {}", FP_MODEL);
-    // const ASPECT_RATIO: Real = 16f32 / 9f32;
-    const IMAGE_WIDTH: i32 = 1200;
-    const IMAGE_HEIGHT: i32 = 800;
-    const SAMPLES_PER_PIXEL: i32 = 256;
-    const MAX_DEPTH: i32 = 50;
+    // let minutes = render_duration.as_secs() / 60u64;
+    // let seconds = (render_duration - std::time::Duration::from_secs(minutes * 60u64)).as_secs();
 
-    let look_from = Point::new(13 as Real, 2 as Real, 3 as Real);
-    let look_at = Point::new(0 as Real, 0 as Real, 0 as Real);
-    let world_up = Vec3::new(0 as Real, 1 as Real, 0 as Real);
-    let aperture = 0.1 as Real;
-    let focus_dist = 10 as Real;
-    let vertical_fov = 20 as Real;
-
-    let params = RaytracerParams {
-        workers: 8,
-        image_width: IMAGE_WIDTH,
-        image_height: IMAGE_HEIGHT,
-        samples_per_pixel: SAMPLES_PER_PIXEL,
-        max_ray_depth: MAX_DEPTH,
-        aspect_ratio: (IMAGE_WIDTH as Real) / (IMAGE_HEIGHT as Real),
-        look_at,
-        look_from,
-        world_up,
-        aperture,
-        focus_dist,
-        vertical_fov,
-    };
-
-    let start_time = std::time::Instant::now();
-    let raytraced_pixels = raytrace_mt(params, make_random_world());
-    let render_duration = start_time.elapsed();
-
-    let minutes = render_duration.as_secs() / 60u64;
-    let seconds = (render_duration - std::time::Duration::from_secs(minutes * 60u64)).as_secs();
-
-    println!(
-        "Finished! Rendering settings : floating point model: {} precision\n{:?}\nTotal render time = {} minutes {} seconds",
-        FP_MODEL,
-        params, minutes, seconds
-    );
-
-    write_png(
-        "raytraced_mt.png",
-        params.image_width as u32,
-        params.image_height as u32,
-        params.samples_per_pixel,
-        &raytraced_pixels,
-    )
-    .map_err(|e| format!("Failed to write image, error {}", e))?;
+    let mut main_window = Main::new();
+    main_window.main_loop();
 
     Ok(())
+}
+
+#[derive(Copy, Clone, Debug)]
+struct FrameRenderContext {
+    framebuffer_width: i32,
+    framebuffer_height: i32,
+}
+
+struct RaytracingGlState {
+    vao: rendering::UniqueVertexArray,
+    vs: rendering::UniqueShaderProgram,
+    fs: rendering::UniqueShaderProgram,
+    pipeline: rendering::UniquePipeline,
+    texture: rendering::UniqueTexture,
+    sampler: rendering::UniqueSampler,
+    img_width: i32,
+    img_height: i32,
+}
+
+impl RaytracingGlState {
+    const VS_PROGRAM: &'static str = r#"
+#version 460 core
+
+layout(location = 1) out vec2 texCoord;
+
+out gl_PerVertex {
+    layout(location = 0) vec4 gl_Position;
+};
+
+void main()
+{
+    vec2 position = vec2(gl_VertexID % 2, gl_VertexID / 2) * 4.0 - 1;
+    texCoord = (position + 1) * 0.5;
+    texCoord.y = 1.0 - texCoord.y;
+
+    gl_Position = vec4(position, 0, 1);
+}
+"#;
+
+    const FS_PROGRAM: &'static str = r#"
+#version 460 core
+
+layout(location = 1) in vec2 texCoord;
+layout(binding = 0) uniform sampler2D texImg;
+layout(location = 0) out vec4 FinalFragColor;
+
+void main()
+{
+    FinalFragColor = texture(texImg, texCoord);
+}
+"#;
+
+    fn new(img_width: u32, img_height: u32) -> RaytracingGlState {
+        let vao = rendering::UniqueVertexArray::new(unsafe {
+            let mut vao: u32 = 0;
+            gl::CreateVertexArrays(1, &mut vao as *mut _);
+            vao
+        })
+        .expect("Failed to create vertexarray object");
+
+        let vs = rendering::create_shader_program_from_string(
+            Self::VS_PROGRAM,
+            rendering::ShaderType::Vertex,
+        )
+        .expect("Failed to create vertex shader");
+
+        let fs = rendering::create_shader_program_from_string(
+            Self::FS_PROGRAM,
+            rendering::ShaderType::Fragment,
+        )
+        .expect("Failed to create fragment shader");
+
+        let pipeline = rendering::UniquePipeline::new(unsafe {
+            let mut pipeline = 0u32;
+            gl::GenProgramPipelines(1, &mut pipeline as *mut _);
+            pipeline
+        })
+        .expect("Failed to create pipeline");
+
+        unsafe {
+            gl::UseProgramStages(*pipeline, gl::VERTEX_SHADER_BIT, *vs);
+            gl::UseProgramStages(*pipeline, gl::FRAGMENT_SHADER_BIT, *fs);
+        }
+
+        let texture = rendering::UniqueTexture::new(unsafe {
+            let mut texture = 0u32;
+            gl::CreateTextures(gl::TEXTURE_2D, 1, &mut texture as *mut _);
+            gl::TextureStorage2D(texture, 1, gl::RGB32F, img_width as i32, img_height as i32);
+
+            texture
+        })
+        .expect("Failed to create texture");
+
+        let mut text_pixels = vec![0f32; (img_width * img_height * 3) as usize];
+        for y in 0..img_height {
+            for x in 0..img_width {
+                text_pixels[(y * img_width * 3 + x * 3 + 0) as usize] = x as f32 / img_width as f32;
+                text_pixels[(y * img_width * 3 + x * 3 + 1) as usize] =
+                    y as f32 / img_height as f32;
+            }
+        }
+
+        unsafe {
+            gl::TextureSubImage2D(
+                *texture,
+                0,
+                0,
+                0,
+                img_width as i32,
+                img_height as i32,
+                gl::RGB,
+                gl::FLOAT,
+                text_pixels.as_ptr() as *const _ as *const c_void,
+            );
+        }
+
+        let sampler = rendering::UniqueSampler::new(unsafe {
+            let mut sampler = 0u32;
+            gl::CreateSamplers(1, &mut sampler as *mut _);
+            gl::SamplerParameteri(sampler, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+            gl::SamplerParameteri(
+                sampler,
+                gl::TEXTURE_MIN_FILTER,
+                gl::LINEAR_MIPMAP_LINEAR as i32,
+            );
+
+            sampler
+        })
+        .expect("Failed to create sampler");
+
+        RaytracingGlState {
+            vao,
+            vs,
+            fs,
+            pipeline,
+            texture,
+            sampler,
+            img_width: img_width as i32,
+            img_height: img_height as i32,
+        }
+    }
+
+    fn update_texture(&self, pixels: &[f32]) {
+        unsafe {
+            gl::TextureSubImage2D(
+                *self.texture,
+                0,
+                0,
+                0,
+                self.img_width,
+                self.img_height,
+                gl::RGB,
+                gl::FLOAT,
+                pixels.as_ptr() as *const c_void,
+            );
+        }
+    }
+
+    fn render(&self, _frame_ctx: &FrameRenderContext) {
+        unsafe {
+            gl::BindProgramPipeline(*self.pipeline);
+            gl::BindVertexArray(*self.vao);
+            gl::BindTextureUnit(0, *self.texture);
+            gl::DrawArrays(gl::TRIANGLES, 0, 3);
+        }
+    }
 }
