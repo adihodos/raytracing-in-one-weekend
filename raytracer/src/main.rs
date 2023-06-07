@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 mod ui;
 
 mod aabb3;
+mod block;
 mod bvh;
 mod camera;
 mod checker_texture;
@@ -52,6 +53,7 @@ use glfw::Context;
 use ui::UiBackend;
 
 use crate::{
+    block::Block,
     objects::sphere::MovingSphere,
     rectangles::{XZRect, YZRect},
 };
@@ -433,6 +435,18 @@ fn scene_cornell_box() -> HittableList {
         k: 554f32,
         mtl: light,
     }));
+
+    world.add(Arc::new(Block::new(
+        (130f32, 0f32, 65f32),
+        (295f32, 165f32, 230f32),
+        colors[1].clone(),
+    )));
+
+    world.add(Arc::new(Block::new(
+        (265f32, 0f32, 295f32),
+        (430f32, 330f32, 460f32),
+        colors[1].clone(),
+    )));
 
     world
 }
