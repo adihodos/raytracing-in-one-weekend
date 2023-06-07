@@ -15,6 +15,7 @@ mod ui;
 mod camera;
 mod checker_texture;
 mod dielectric;
+mod diffuse_light;
 mod generic_handle;
 mod hittable;
 mod hittable_list;
@@ -97,25 +98,29 @@ fn write_png<P: AsRef<std::path::Path>>(
         })
 }
 
-fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
+fn ray_color(r: &Ray, background: Color, world: &HittableList, depth: i32) -> Color {
     if depth <= 0 {
         return Color::broadcast(0 as Real);
     }
 
     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
+        let emitted = rec.mtl.emitted(rec.u, rec.v, rec.p);
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
-            return scatter.attenuation * ray_color(&scatter.ray, world, depth - 1);
+            return emitted
+                + scatter.attenuation * ray_color(&scatter.ray, background, world, depth - 1);
         } else {
-            return Color::broadcast(0 as Real);
+            return emitted;
         }
+    } else {
+        return background;
     }
 
-    use math::vec3::normalize;
-    let unit_direction = normalize(r.direction);
-    let t = 0.5 as Real * (unit_direction.y + 1 as Real);
+    // use math::vec3::normalize;
+    // let unit_direction = normalize(r.direction);
+    // let t = 0.5 as Real * (unit_direction.y + 1 as Real);
 
-    (1 as Real - t) * Color::broadcast(1 as Real)
-        + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
+    // (1 as Real - t) * Color::broadcast(1 as Real)
+    //     + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
 }
 
 fn scene_random_world() -> HittableList {
@@ -283,6 +288,7 @@ struct RaytracerParams {
     aperture: Real,
     focus_dist: Real,
     shuffle_workblocks: bool,
+    background: [Real; 3],
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -421,7 +427,13 @@ impl RaytracerState {
                                                 - (y as Real + random_real())
                                                     / (params.image_height - 1) as Real;
                                             let r = cam.get_ray(u, v);
-                                            color + ray_color(&r, &world, params.max_ray_depth)
+                                            color
+                                                + ray_color(
+                                                    &r,
+                                                    params.background.into(),
+                                                    &world,
+                                                    params.max_ray_depth,
+                                                )
                                         },
                                     );
 

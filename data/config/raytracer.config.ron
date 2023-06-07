@@ -13,4 +13,5 @@
     aperture: 0.0,
     focus_dist: 10.0,
     shuffle_workblocks: true,
+    background: (0.7, 0.8, 1.0),
 )
