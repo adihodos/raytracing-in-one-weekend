@@ -28,12 +28,14 @@ use lambertian::Lambertian;
 use metal::Metal;
 use objects::{disk::Disk, plane::Plane, sphere::Sphere, triangle::Triangle};
 
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use rendering::gl;
 use types::*;
 
 use glfw::Context;
 use ui::UiBackend;
+
+use crate::objects::sphere::MovingSphere;
 
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
@@ -128,24 +130,35 @@ fn make_random_world() -> HittableList {
             use math::vec3::{length, sqrt};
 
             if length(center - sqrt(Point::new(4 as Real, 0.2 as Real, 0 as Real))) > 0.9 as Real {
-                use crate::material::Material;
                 let choose_mat = random_real();
 
-                let sphere_material: Arc<dyn Material> = if choose_mat < 0.8 as Real {
+                if choose_mat < 0.8 as Real {
+                    //
                     // diffuse
                     let albedo = random_color() * random_color();
-                    Arc::new(Lambertian::new(albedo))
+                    let sphere_material = Arc::new(Lambertian::new(albedo));
+                    let center2 = center + Vec3::new(0f32, random_real_range(0f32, 0.5f32), 0f32);
+                    world.add(Arc::new(MovingSphere::new(
+                        center,
+                        center2,
+                        0f32,
+                        1f32,
+                        0.2 as Real,
+                        sphere_material,
+                    )));
                 } else if choose_mat < 0.95 as Real {
+                    //
                     // metal
                     let albedo = random_color_in_range(0.5 as Real, 1 as Real);
                     let fuzziness = random_real_range(0 as Real, 0.5 as Real);
-                    Arc::new(Metal::new(albedo, fuzziness))
+                    let sphere_material = Arc::new(Metal::new(albedo, fuzziness));
+                    world.add(Arc::new(Sphere::new(center, 0.2 as Real, sphere_material)));
                 } else {
+                    //
                     // glass
-                    Arc::new(Dielectric::new(1.5 as Real))
-                };
-
-                world.add(Arc::new(Sphere::new(center, 0.2 as Real, sphere_material)));
+                    let sphere_material = Arc::new(Dielectric::new(1.5 as Real));
+                    world.add(Arc::new(Sphere::new(center, 0.2 as Real, sphere_material)));
+                }
             }
         });
     });
@@ -317,6 +330,8 @@ impl RaytracerState {
             params.aspect_ratio,
             params.aperture,
             params.focus_dist,
+            0f32,
+            1f32,
         );
 
         let total_workblocks = workblocks.len() as u32;

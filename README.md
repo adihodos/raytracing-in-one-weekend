@@ -12,4 +12,4 @@ A Rust implementation of Raytracing In One Weekend
 cargo run --release
 ```
 
-![thumbnail](./images/raytraced_mt.png)
+![thumbnail](./images/thumbnail1.png)

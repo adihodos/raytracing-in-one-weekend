@@ -24,7 +24,7 @@ impl Material for Metal {
 
         if are_on_the_same_plane_side(scattered, hit_record.normal) {
             Some(ScatterRecord {
-                ray: Ray::new(hit_record.p, scattered),
+                ray: Ray::new(hit_record.p, scattered, ray.time),
                 attenuation: self.albedo,
             })
         } else {

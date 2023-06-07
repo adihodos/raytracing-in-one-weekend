@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::types::{Point, Ray, Real, Vec3};
 
 #[derive(Copy, Clone)]
@@ -10,6 +12,8 @@ pub struct Camera {
     v: Vec3,
     w: Vec3,
     lens_radius: Real,
+    time0: Real,
+    time1: Real,
 }
 
 impl Camera {
@@ -21,6 +25,8 @@ impl Camera {
         aspect_ratio: Real,
         aperture: Real,
         focus_dist: Real,
+        time0: Real,
+        time1: Real,
     ) -> Camera {
         use crate::types::degrees_to_radians;
         use math::vec3::{cross, normalize};
@@ -48,6 +54,8 @@ impl Camera {
             u,
             v,
             w,
+            time0,
+            time1,
         }
     }
 
@@ -59,6 +67,7 @@ impl Camera {
         Ray::new(
             self.origin + offset,
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
+            rand::thread_rng().gen_range(self.time0, self.time1),
         )
     }
 }

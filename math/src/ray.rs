@@ -7,14 +7,19 @@ use num_traits::Num;
 pub struct TRay<T> {
     pub origin: TVec3<T>,
     pub direction: TVec3<T>,
+    pub time: T,
 }
 
 impl<T> TRay<T>
 where
     T: Copy + Clone + Num + std::fmt::Debug,
 {
-    pub fn new(origin: TVec3<T>, direction: TVec3<T>) -> TRay<T> {
-        TRay { origin, direction }
+    pub fn new(origin: TVec3<T>, direction: TVec3<T>, time: T) -> TRay<T> {
+        TRay {
+            origin,
+            direction,
+            time,
+        }
     }
 
     pub fn at(&self, t: T) -> TVec3<T>

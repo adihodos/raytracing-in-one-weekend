@@ -32,6 +32,7 @@ impl Material for Dielectric {
                 ray: Ray::new(
                     hit_record.p,
                     reflect_unit_vector(uv, normalize(hit_record.normal)),
+                    ray.time,
                 ),
                 attenuation: Color::broadcast(1 as Real),
             })
@@ -41,14 +42,22 @@ impl Material for Dielectric {
             let reflect_probability = schlick(cos_theta, etai_over_etat);
             if random_real() < reflect_probability {
                 Some(ScatterRecord {
-                    ray: Ray::new(hit_record.p, reflect_unit_vector(uv, hit_record.normal)),
+                    ray: Ray::new(
+                        hit_record.p,
+                        reflect_unit_vector(uv, hit_record.normal),
+                        ray.time,
+                    ),
                     attenuation: Color::broadcast(1 as Real),
                 })
             } else {
                 // refract
                 Some(ScatterRecord {
                     attenuation: Color::broadcast(1 as Real),
-                    ray: Ray::new(hit_record.p, refract(uv, hit_record.normal, etai_over_etat)),
+                    ray: Ray::new(
+                        hit_record.p,
+                        refract(uv, hit_record.normal, etai_over_etat),
+                        ray.time,
+                    ),
                 })
             }
         }
