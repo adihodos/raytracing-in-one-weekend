@@ -12,7 +12,7 @@ version = "0.1.0"
 [dependencies]
     math = { path = "../math" }
     rendering = { path = "../rendering" }
-    rand = "0.7"
+    rand = "*"
     png = "0.16"
     num = "0.2"
     num-traits = "0.2"
@@ -21,3 +21,4 @@ version = "0.1.0"
     serde = { version = "*", features = ["derive"] }
     ron = "*"
     humantime = "*"
+    image = "*"

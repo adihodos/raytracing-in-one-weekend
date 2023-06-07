@@ -28,6 +28,8 @@ mod rtow_types {
     pub const FP_MODEL: &'static str = "single";
 }
 
+use math::vec3::normalize;
+use rand::Rng;
 pub use rtow_types::*;
 pub type Vec3 = math::vec3::TVec3<Real>;
 pub type Ray = math::ray::TRay<Real>;
@@ -39,8 +41,7 @@ pub fn degrees_to_radians(degrees: Real) -> Real {
 }
 
 pub fn random_real() -> Real {
-    use rand::prelude::*;
-    thread_rng().gen()
+    rand::thread_rng().gen_range(0.0, 1.0) as Real
 }
 
 pub fn random_real_range(min: Real, max: Real) -> Real {
@@ -98,10 +99,7 @@ pub fn random_in_unit_sphere() -> Vec3 {
 }
 
 pub fn random_unit_vector() -> Vec3 {
-    let a = random_real_range(0 as Real, 2 as Real * C_PI);
-    let z = random_real_range(-1 as Real, 1 as Real);
-    let r = (1 as Real - z * z).sqrt();
-    Vec3::new(r * a.cos(), r * a.sin(), z)
+    normalize(random_in_unit_sphere())
 }
 
 pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {

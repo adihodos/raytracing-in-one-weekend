@@ -22,7 +22,7 @@ impl HitRecord {
         u: Real,
         v: Real,
     ) -> HitRecord {
-        let front_face = !math::vec3::are_on_the_same_plane_side(ray.direction, outward_normal);
+        let front_face = math::vec3::dot(ray.direction, outward_normal) < 0f32;
         HitRecord {
             p,
             normal: if front_face {
@@ -31,7 +31,7 @@ impl HitRecord {
                 -outward_normal
             },
             t,
-            mtl: std::sync::Arc::clone(&mtl),
+            mtl,
             front_face,
             u,
             v,

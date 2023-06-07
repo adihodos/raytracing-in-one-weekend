@@ -485,6 +485,13 @@ where
     }
 }
 
+pub fn is_near_zero<T>(v: TVec3<T>) -> bool
+where
+    T: Copy + Clone + Float + std::fmt::Debug,
+{
+    length_squared(v).is_zero()
+}
+
 /// Make a unit length vector from the input vector.
 pub fn normalize<T>(v: TVec3<T>) -> TVec3<T>
 where

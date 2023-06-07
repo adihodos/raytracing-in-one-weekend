@@ -1,3 +1,5 @@
+use math::vec3::{self, length_squared};
+
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
 use crate::types::{Point, Ray, Real};
@@ -19,6 +21,7 @@ impl Sphere {
     }
 
     fn get_uv(p: Point) -> (f32, f32) {
+        //
         // p: a given point on the sphere of radius one, centered at the origin.
         // u: returned value [0,1] of angle around the Y axis from X=-1.
         // v: returned value [0,1] of angle from Y=-1 to Y=+1.
@@ -38,56 +41,42 @@ impl Sphere {
 
 impl Hittable for Sphere {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
-        use math::vec3::{dot, length_squared};
-
         let oc = r.origin - self.center;
         let a = length_squared(r.direction);
-        let half_b = dot(oc, r.direction);
+        let half_b = vec3::dot(oc, r.direction);
+
         let c = length_squared(oc) - self.radius * self.radius;
 
-        let delta = half_b * half_b - a * c;
-
-        if delta > 0 as Real {
-            let root = delta.sqrt();
-            let temp = (-half_b - root) / a;
-            if temp < t_max && temp > t_min {
-                let p = r.at(temp);
-                let outward_normal = (p - self.center) / self.radius;
-                let (u, v) = Self::get_uv(outward_normal);
-
-                Some(HitRecord::new(
-                    p,
-                    outward_normal,
-                    r,
-                    temp,
-                    std::sync::Arc::clone(&self.mtl),
-                    u,
-                    v,
-                ))
-            } else {
-                let temp = (-half_b + root) / a;
-
-                if temp < t_max && temp > t_min {
-                    let p = r.at(temp);
-                    let outward_normal = (p - self.center) / self.radius;
-                    let (u, v) = Self::get_uv(outward_normal);
-
-                    Some(HitRecord::new(
-                        p,
-                        outward_normal,
-                        r,
-                        temp,
-                        std::sync::Arc::clone(&self.mtl),
-                        u,
-                        v,
-                    ))
-                } else {
-                    None
-                }
-            }
-        } else {
-            None
+        let discriminant = half_b * half_b - a * c;
+        if discriminant < 0f32 {
+            return None;
         }
+        let sqrtd = discriminant.sqrt();
+
+        //
+        // Find the nearest root that lies in the acceptable range.
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || t_max < root {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || t_max < root {
+                return None;
+            }
+        }
+
+        let t = root;
+        let p = r.at(t);
+        let outward_normal = (p - self.center) / self.radius;
+        let (u, v) = Self::get_uv(outward_normal);
+
+        Some(HitRecord::new(
+            p,
+            outward_normal,
+            r,
+            t,
+            self.mtl.clone(),
+            u,
+            v,
+        ))
     }
 }
 
@@ -132,49 +121,39 @@ impl Hittable for MovingSphere {
 
         let oc = r.origin - self.center(r.time);
         let a = length_squared(r.direction);
-        let half_b = dot(oc, r.direction);
+        let half_b = vec3::dot(oc, r.direction);
+
         let c = length_squared(oc) - self.radius * self.radius;
 
-        let delta = half_b * half_b - a * c;
-
-        if delta > 0 as Real {
-            let root = delta.sqrt();
-            let temp = (-half_b - root) / a;
-            if temp < t_max && temp > t_min {
-                let p = r.at(temp);
-                let outward_normal = (p - self.center(r.time)) / self.radius;
-                let (u, v) = Sphere::get_uv(outward_normal);
-
-                Some(HitRecord::new(
-                    p,
-                    outward_normal,
-                    r,
-                    temp,
-                    std::sync::Arc::clone(&self.mtl),
-                    u,
-                    v,
-                ))
-            } else {
-                let temp = (-half_b + root) / a;
-                if temp < t_max && temp > t_min {
-                    let p = r.at(temp);
-                    let outward_normal = (p - self.center(r.time)) / self.radius;
-                    let (u, v) = Sphere::get_uv(outward_normal);
-                    Some(HitRecord::new(
-                        p,
-                        outward_normal,
-                        r,
-                        temp,
-                        std::sync::Arc::clone(&self.mtl),
-                        u,
-                        v,
-                    ))
-                } else {
-                    None
-                }
-            }
-        } else {
-            None
+        let discriminant = half_b * half_b - a * c;
+        if discriminant < 0f32 {
+            return None;
         }
+        let sqrtd = discriminant.sqrt();
+
+        //
+        // Find the nearest root that lies in the acceptable range.
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || t_max < root {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || t_max < root {
+                return None;
+            }
+        }
+
+        let t = root;
+        let p = r.at(t);
+        let outward_normal = (p - self.center(r.time)) / self.radius;
+        let (u, v) = Sphere::get_uv(outward_normal);
+
+        Some(HitRecord::new(
+            p,
+            outward_normal,
+            r,
+            t,
+            self.mtl.clone(),
+            u,
+            v,
+        ))
     }
 }

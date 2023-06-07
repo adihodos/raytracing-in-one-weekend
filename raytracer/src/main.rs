@@ -6,6 +6,8 @@ use std::{
 };
 
 use checker_texture::CheckerTexture;
+use image_texture::ImageTexture;
+use noise_texture::NoiseTexture;
 use serde::{Deserialize, Serialize};
 
 mod ui;
@@ -16,10 +18,13 @@ mod dielectric;
 mod generic_handle;
 mod hittable;
 mod hittable_list;
+mod image_texture;
 mod lambertian;
 mod material;
 mod metal;
+mod noise_texture;
 mod objects;
+mod perlin;
 mod solid_color_texture;
 mod texture;
 
@@ -217,47 +222,50 @@ fn scene_two_spheres() -> HittableList {
 
     world
 }
-// fn make_random_world2() -> HittableList {
-//     let ground_mtl = Arc::new(Lambertian::new(Color::new(
-//         0.9 as Real,
-//         0.3 as Real,
-//         0 as Real,
-//     )));
 
-//     let mut world = HittableList::new();
-//     world.add(Arc::new(Plane::new(
-//         Point::broadcast(0 as Real),
-//         Vec3::new(0 as Real, 1 as Real, 0 as Real),
-//         ground_mtl,
-//     )));
+fn scene_two_perlin_spheres() -> HittableList {
+    // let image_texture = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+    //     "data/textures/uv_grids/ash_uvgrid10.jpg",
+    // ))));
 
-//     let disk_mtl = Arc::new(Lambertian::new(Color::new(
-//         0 as Real,
-//         0.9 as Real,
-//         0.1 as Real,
-//     )));
+    // let image_texture1 = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+    //     "data/textures/uv_grids/ash_uvgrid01.jpg",
+    // ))));
 
-//     world.add(Arc::new(Disk {
-//         origin: Point::new(0 as Real, 0 as Real, -1 as Real),
-//         normal: Vec3::new(0 as Real, 0 as Real, 1 as Real),
-//         radius: 0.5 as Real,
-//         mtl: disk_mtl,
-//     }));
+    let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new())));
 
-//     let triangle_mtl = Arc::new(Metal::new(
-//         Color::new(0 as Real, 0.1 as Real, 0.9 as Real),
-//         0.1 as Real,
-//     ));
+    let mut world = HittableList::new();
 
-//     world.add(Arc::new(Triangle::new(
-//         Point::new(-5 as Real, 0 as Real, -1 as Real),
-//         Point::new(5 as Real, 0 as Real, -2 as Real),
-//         Point::new(0 as Real, 3 as Real, -1 as Real),
-//         triangle_mtl,
-//     )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, -1000f32, 0f32),
+        1000f32,
+        noise_mtl.clone(),
+    )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, 2f32, 0f32),
+        2f32,
+        noise_mtl.clone(),
+    )));
 
-//     world
-// }
+    world
+}
+
+fn scene_textured_spheres() -> HittableList {
+    let image_texture = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        // "data/textures/uv_grids/ash_uvgrid01.jpg",
+        "data/textures/misc/earthmap.jpg",
+    ))));
+
+    let mut world = HittableList::new();
+
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, 0f32, 0f32),
+        2f32,
+        image_texture.clone(),
+    )));
+
+    world
+}
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct RaytracerParams {
@@ -361,7 +369,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(scene_two_spheres());
+        let world = Arc::new(scene_random_world());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =
