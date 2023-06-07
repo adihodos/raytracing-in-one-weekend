@@ -1,13 +1,19 @@
-use crate::{perlin::PerlinNoise, texture::Texture, types::Color};
+use crate::{
+    perlin::PerlinNoise,
+    texture::Texture,
+    types::{Color, Real},
+};
 
 pub struct NoiseTexture {
     perlin: PerlinNoise,
+    scale: Real,
 }
 
 impl NoiseTexture {
-    pub fn new() -> Self {
+    pub fn new(scale: Real) -> Self {
         Self {
             perlin: PerlinNoise::new(),
+            scale,
         }
     }
 }
@@ -19,6 +25,8 @@ impl Texture for NoiseTexture {
         _v: crate::types::Real,
         point: crate::types::Point,
     ) -> crate::types::Color {
-        Color::broadcast(1f32) * self.perlin.noise(point)
+        Color::broadcast(1f32)
+            * 0.5f32
+            * (1f32 + (self.scale * point.z + 10f32 * self.perlin.turbulence(point, 7)).sin())
     }
 }

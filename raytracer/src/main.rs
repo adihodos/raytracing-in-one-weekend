@@ -232,7 +232,7 @@ fn scene_two_perlin_spheres() -> HittableList {
     //     "data/textures/uv_grids/ash_uvgrid01.jpg",
     // ))));
 
-    let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new())));
+    let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new(3f32))));
 
     let mut world = HittableList::new();
 
@@ -369,7 +369,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(scene_random_world());
+        let world = Arc::new(scene_two_perlin_spheres());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =
