@@ -1,14 +1,22 @@
 use crate::hittable::HitRecord;
 use crate::material::{Material, ScatterRecord};
+use crate::solid_color_texture::SolidColorTexture;
+use crate::texture::Texture;
 use crate::types::{random_unit_vector, Color, Ray};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone)]
 pub struct Lambertian {
-    pub albedo: Color,
+    pub albedo: std::sync::Arc<dyn Texture>,
 }
 
 impl Lambertian {
     pub fn new(albedo: Color) -> Lambertian {
+        Lambertian {
+            albedo: std::sync::Arc::new(SolidColorTexture::new(albedo)),
+        }
+    }
+
+    pub fn from_texture(albedo: std::sync::Arc<dyn Texture>) -> Lambertian {
         Lambertian { albedo }
     }
 }
@@ -18,7 +26,7 @@ impl Material for Lambertian {
         let scatter_direction = hit_record.normal + random_unit_vector();
         Some(ScatterRecord {
             ray: Ray::new(hit_record.p, scatter_direction, ray.time),
-            attenuation: self.albedo,
+            attenuation: self.albedo.value(hit_record.u, hit_record.v, hit_record.p),
         })
     }
 }

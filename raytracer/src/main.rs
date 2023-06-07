@@ -5,11 +5,13 @@ use std::{
     sync::{mpsc::Receiver, Arc},
 };
 
+use checker_texture::CheckerTexture;
 use serde::{Deserialize, Serialize};
 
 mod ui;
 
 mod camera;
+mod checker_texture;
 mod dielectric;
 mod generic_handle;
 mod hittable;
@@ -18,6 +20,8 @@ mod lambertian;
 mod material;
 mod metal;
 mod objects;
+mod solid_color_texture;
+mod texture;
 
 mod types;
 
@@ -26,9 +30,9 @@ use hittable::Hittable;
 use hittable_list::HittableList;
 use lambertian::Lambertian;
 use metal::Metal;
-use objects::{disk::Disk, plane::Plane, sphere::Sphere, triangle::Triangle};
+use objects::sphere::Sphere;
 
-use rand::{seq::SliceRandom, Rng};
+use rand::seq::SliceRandom;
 use rendering::gl;
 use types::*;
 
@@ -109,8 +113,10 @@ fn ray_color(r: &Ray, world: &HittableList, depth: i32) -> Color {
         + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
 }
 
-fn make_random_world() -> HittableList {
-    let ground_material = Arc::new(Lambertian::new(Color::broadcast(0.5 as Real)));
+fn scene_random_world() -> HittableList {
+    let ground_material = Arc::new(Lambertian::from_texture(Arc::new(
+        CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32)),
+    )));
     let mut world = HittableList::new();
 
     world.add(Arc::new(Sphere::new(
@@ -191,47 +197,67 @@ fn make_random_world() -> HittableList {
     world
 }
 
-fn make_random_world2() -> HittableList {
-    let ground_mtl = Arc::new(Lambertian::new(Color::new(
-        0.9 as Real,
-        0.3 as Real,
-        0 as Real,
+fn scene_two_spheres() -> HittableList {
+    let checker_mtl = Arc::new(Lambertian::from_texture(Arc::new(
+        CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32)),
     )));
 
     let mut world = HittableList::new();
-    world.add(Arc::new(Plane::new(
-        Point::broadcast(0 as Real),
-        Vec3::new(0 as Real, 1 as Real, 0 as Real),
-        ground_mtl,
+
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, -10f32, 0f32),
+        10f32,
+        checker_mtl.clone(),
     )));
-
-    let disk_mtl = Arc::new(Lambertian::new(Color::new(
-        0 as Real,
-        0.9 as Real,
-        0.1 as Real,
-    )));
-
-    world.add(Arc::new(Disk {
-        origin: Point::new(0 as Real, 0 as Real, -1 as Real),
-        normal: Vec3::new(0 as Real, 0 as Real, 1 as Real),
-        radius: 0.5 as Real,
-        mtl: disk_mtl,
-    }));
-
-    let triangle_mtl = Arc::new(Metal::new(
-        Color::new(0 as Real, 0.1 as Real, 0.9 as Real),
-        0.1 as Real,
-    ));
-
-    world.add(Arc::new(Triangle::new(
-        Point::new(-5 as Real, 0 as Real, -1 as Real),
-        Point::new(5 as Real, 0 as Real, -2 as Real),
-        Point::new(0 as Real, 3 as Real, -1 as Real),
-        triangle_mtl,
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, 10f32, 0f32),
+        10f32,
+        checker_mtl.clone(),
     )));
 
     world
 }
+// fn make_random_world2() -> HittableList {
+//     let ground_mtl = Arc::new(Lambertian::new(Color::new(
+//         0.9 as Real,
+//         0.3 as Real,
+//         0 as Real,
+//     )));
+
+//     let mut world = HittableList::new();
+//     world.add(Arc::new(Plane::new(
+//         Point::broadcast(0 as Real),
+//         Vec3::new(0 as Real, 1 as Real, 0 as Real),
+//         ground_mtl,
+//     )));
+
+//     let disk_mtl = Arc::new(Lambertian::new(Color::new(
+//         0 as Real,
+//         0.9 as Real,
+//         0.1 as Real,
+//     )));
+
+//     world.add(Arc::new(Disk {
+//         origin: Point::new(0 as Real, 0 as Real, -1 as Real),
+//         normal: Vec3::new(0 as Real, 0 as Real, 1 as Real),
+//         radius: 0.5 as Real,
+//         mtl: disk_mtl,
+//     }));
+
+//     let triangle_mtl = Arc::new(Metal::new(
+//         Color::new(0 as Real, 0.1 as Real, 0.9 as Real),
+//         0.1 as Real,
+//     ));
+
+//     world.add(Arc::new(Triangle::new(
+//         Point::new(-5 as Real, 0 as Real, -1 as Real),
+//         Point::new(5 as Real, 0 as Real, -2 as Real),
+//         Point::new(0 as Real, 3 as Real, -1 as Real),
+//         triangle_mtl,
+//     )));
+
+//     world
+// }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct RaytracerParams {
@@ -335,7 +361,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(make_random_world());
+        let world = Arc::new(scene_two_spheres());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =

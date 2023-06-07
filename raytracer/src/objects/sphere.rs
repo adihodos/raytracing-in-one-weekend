@@ -17,6 +17,23 @@ impl Sphere {
             mtl,
         }
     }
+
+    fn get_uv(p: Point) -> (f32, f32) {
+        // p: a given point on the sphere of radius one, centered at the origin.
+        // u: returned value [0,1] of angle around the Y axis from X=-1.
+        // v: returned value [0,1] of angle from Y=-1 to Y=+1.
+        //     <1 0 0> yields <0.50 0.50>       <-1  0  0> yields <0.00 0.50>
+        //     <0 1 0> yields <0.50 1.00>       < 0 -1  0> yields <0.50 0.00>
+        //     <0 0 1> yields <0.25 0.50>       < 0  0 -1> yields <0.75 0.50>
+
+        let theta = (-p.y).acos();
+        let phi = (-p.z).atan2(p.x) + std::f64::consts::PI as Real;
+
+        (
+            phi / (2f64 * std::f64::consts::PI) as Real,
+            theta / std::f64::consts::PI as Real,
+        )
+    }
 }
 
 impl Hittable for Sphere {
@@ -35,23 +52,34 @@ impl Hittable for Sphere {
             let temp = (-half_b - root) / a;
             if temp < t_max && temp > t_min {
                 let p = r.at(temp);
+                let outward_normal = (p - self.center) / self.radius;
+                let (u, v) = Self::get_uv(outward_normal);
+
                 Some(HitRecord::new(
                     p,
-                    (p - self.center) / self.radius,
+                    outward_normal,
                     r,
                     temp,
                     std::sync::Arc::clone(&self.mtl),
+                    u,
+                    v,
                 ))
             } else {
                 let temp = (-half_b + root) / a;
+
                 if temp < t_max && temp > t_min {
                     let p = r.at(temp);
+                    let outward_normal = (p - self.center) / self.radius;
+                    let (u, v) = Self::get_uv(outward_normal);
+
                     Some(HitRecord::new(
                         p,
-                        (p - self.center) / self.radius,
+                        outward_normal,
                         r,
                         temp,
                         std::sync::Arc::clone(&self.mtl),
+                        u,
+                        v,
                     ))
                 } else {
                     None
@@ -114,23 +142,32 @@ impl Hittable for MovingSphere {
             let temp = (-half_b - root) / a;
             if temp < t_max && temp > t_min {
                 let p = r.at(temp);
+                let outward_normal = (p - self.center(r.time)) / self.radius;
+                let (u, v) = Sphere::get_uv(outward_normal);
+
                 Some(HitRecord::new(
                     p,
-                    (p - self.center(r.time)) / self.radius,
+                    outward_normal,
                     r,
                     temp,
                     std::sync::Arc::clone(&self.mtl),
+                    u,
+                    v,
                 ))
             } else {
                 let temp = (-half_b + root) / a;
                 if temp < t_max && temp > t_min {
                     let p = r.at(temp);
+                    let outward_normal = (p - self.center(r.time)) / self.radius;
+                    let (u, v) = Sphere::get_uv(outward_normal);
                     Some(HitRecord::new(
                         p,
-                        (p - self.center(r.time)) / self.radius,
+                        outward_normal,
                         r,
                         temp,
                         std::sync::Arc::clone(&self.mtl),
+                        u,
+                        v,
                     ))
                 } else {
                     None

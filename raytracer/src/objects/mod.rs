@@ -1,4 +1,4 @@
-pub mod disk;
-pub mod plane;
+// pub mod disk;
+// pub mod plane;
 pub mod sphere;
-pub mod triangle;
+// pub mod triangle;

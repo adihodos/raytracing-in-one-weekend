@@ -8,6 +8,8 @@ pub struct HitRecord {
     pub t: Real,
     pub mtl: std::sync::Arc<dyn Material>,
     pub front_face: bool,
+    pub u: Real,
+    pub v: Real,
 }
 
 impl HitRecord {
@@ -17,6 +19,8 @@ impl HitRecord {
         ray: &Ray,
         t: Real,
         mtl: std::sync::Arc<dyn Material>,
+        u: Real,
+        v: Real,
     ) -> HitRecord {
         let front_face = !math::vec3::are_on_the_same_plane_side(ray.direction, outward_normal);
         HitRecord {
@@ -29,6 +33,8 @@ impl HitRecord {
             t,
             mtl: std::sync::Arc::clone(&mtl),
             front_face,
+            u,
+            v,
         }
     }
 }
