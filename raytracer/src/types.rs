@@ -98,6 +98,10 @@ pub fn random_in_unit_sphere() -> Vec3 {
     }
 }
 
+pub fn random_int(min: i32, max: i32) -> i32 {
+    rand::thread_rng().gen_range(min, max + 1)
+}
+
 pub fn random_unit_vector() -> Vec3 {
     normalize(random_in_unit_sphere())
 }
@@ -133,4 +137,20 @@ pub fn schlick(cosine: Real, refraction_index: Real) -> Real {
     let r0 = (1 as Real - refraction_index) / (1 as Real + refraction_index);
     let r0 = r0 * r0;
     r0 + (1 as Real - r0) * (1 as Real - cosine).powi(5)
+}
+
+pub fn ffmin(a: Real, b: Real) -> Real {
+    if a < b {
+        a
+    } else {
+        b
+    }
+}
+
+pub fn ffmax(a: Real, b: Real) -> Real {
+    if a > b {
+        a
+    } else {
+        b
+    }
 }

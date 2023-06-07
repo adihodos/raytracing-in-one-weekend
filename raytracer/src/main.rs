@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 
 mod ui;
 
+mod aabb3;
+mod bvh;
 mod camera;
 mod checker_texture;
 mod dielectric;

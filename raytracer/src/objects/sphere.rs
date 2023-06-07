@@ -1,5 +1,6 @@
 use math::vec3::{self, length_squared};
 
+use crate::aabb3::Aabb;
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
 use crate::types::{Point, Ray, Real};
@@ -78,6 +79,13 @@ impl Hittable for Sphere {
             v,
         ))
     }
+
+    fn bounding_box(&self, _time0: Real, _time1: Real) -> Option<Aabb> {
+        Some(Aabb::new(
+            self.center - Point::broadcast(self.radius),
+            self.center + Point::broadcast(self.radius),
+        ))
+    }
 }
 
 #[derive(Clone)]
@@ -117,8 +125,6 @@ impl MovingSphere {
 
 impl Hittable for MovingSphere {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
-        use math::vec3::{dot, length_squared};
-
         let oc = r.origin - self.center(r.time);
         let a = length_squared(r.direction);
         let half_b = vec3::dot(oc, r.direction);
@@ -155,5 +161,19 @@ impl Hittable for MovingSphere {
             u,
             v,
         ))
+    }
+
+    fn bounding_box(&self, time0: Real, time1: Real) -> Option<crate::aabb3::Aabb> {
+        let box_t0 = Aabb::new(
+            self.center(time0) - Point::broadcast(self.radius),
+            self.center(time0) + Point::broadcast(self.radius),
+        );
+
+        let box_t1 = Aabb::new(
+            self.center(time1) - Point::broadcast(self.radius),
+            self.center(time1) + Point::broadcast(self.radius),
+        );
+
+        Some(crate::aabb3::merge_aabbs(&box_t0, &box_t1))
     }
 }

@@ -1,3 +1,4 @@
+use crate::aabb3::Aabb;
 use crate::material::Material;
 use crate::types::{Point, Ray, Real, Vec3};
 
@@ -23,6 +24,7 @@ impl HitRecord {
         v: Real,
     ) -> HitRecord {
         let front_face = math::vec3::dot(ray.direction, outward_normal) < 0f32;
+
         HitRecord {
             p,
             normal: if front_face {
@@ -41,4 +43,5 @@ impl HitRecord {
 
 pub trait Hittable: Send + Sync {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord>;
+    fn bounding_box(&self, time0: Real, time1: Real) -> Option<Aabb>;
 }

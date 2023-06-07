@@ -48,4 +48,11 @@ impl Hittable for HittableList {
                 }
             })
     }
+
+    fn bounding_box(&self, time0: Real, time1: Real) -> Option<crate::aabb3::Aabb> {
+        self.objects
+            .iter()
+            .filter_map(|object| object.bounding_box(time0, time1))
+            .reduce(|accum_box, this_box| crate::aabb3::merge_aabbs(&accum_box, &this_box))
+    }
 }
