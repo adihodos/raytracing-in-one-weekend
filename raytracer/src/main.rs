@@ -47,7 +47,7 @@ use lambertian::Lambertian;
 use metal::Metal;
 use objects::sphere::Sphere;
 
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use rendering::gl;
 use types::*;
 
@@ -56,9 +56,11 @@ use ui::UiBackend;
 
 use crate::{
     block::Block,
+    bvh::BvhNode,
     constant_medium::ConstantMedium,
     objects::sphere::MovingSphere,
     rectangles::{XZRect, YZRect},
+    solid_color_texture::SolidColorTexture,
     transform::{RotateY, Translate},
 };
 
@@ -296,7 +298,7 @@ fn scene_simple_light() -> HittableList {
         noise_mtl.clone(),
     )));
 
-    let diffuse_light = Arc::new(DiffuseLight::with_color((4f32, 4f32, 4f32)));
+    let diffuse_light: Arc<DiffuseLight> = Arc::new((4f32, 4f32, 4f32).into());
     world.add(Arc::new(XYRect {
         x0: 3f32,
         x1: 5f32,
@@ -306,7 +308,7 @@ fn scene_simple_light() -> HittableList {
         mtl: diffuse_light,
     }));
 
-    let red_light = Arc::new(DiffuseLight::with_color((4f32, 2f32, 0f32)));
+    let red_light: Arc<DiffuseLight> = Arc::new((4f32, 2f32, 0f32).into());
     world.add(Arc::new(Sphere::new(
         Point::new(0f32, 8f32, 0f32),
         2f32,
@@ -323,10 +325,10 @@ fn scene_cornell_box() -> HittableList {
         (0.12f32, 0.45f32, 0.15f32),
     ]
     .iter()
-    .map(|color| Arc::new(Lambertian::new((*color).into())))
+    .map(|color| Arc::new(Lambertian::new(*color)))
     .collect::<Vec<_>>();
 
-    let light = Arc::new(DiffuseLight::with_color((15f32, 15f32, 15f32)));
+    let light: Arc<DiffuseLight> = Arc::new((15f32, 15f32, 15f32).into());
 
     enum WallType {
         XZ,
@@ -474,10 +476,10 @@ fn scene_cornell_box_smoke() -> HittableList {
         (0.12f32, 0.45f32, 0.15f32),
     ]
     .iter()
-    .map(|color| Arc::new(Lambertian::new((*color).into())))
+    .map(|color| Arc::new(Lambertian::new(*color)))
     .collect::<Vec<_>>();
 
-    let light = Arc::new(DiffuseLight::with_color((7f32, 7f32, 7f32)));
+    let light: Arc<DiffuseLight> = Arc::new((7f32, 7f32, 7f32).into());
 
     enum WallType {
         XZ,
@@ -628,6 +630,153 @@ fn scene_cornell_box_smoke() -> HittableList {
     world
 }
 
+fn final_scene() -> HittableList {
+    let mut rng = rand::thread_rng();
+    let mut world = HittableList::new();
+
+    let white = Arc::new(Lambertian::new((0.73f32, 0.73f32, 0.73f32)));
+
+    let ground = Arc::new(Lambertian::new((0.48_f32, 0.83_f32, 0.53_f32)));
+
+    const NUM_BOXES: i32 = 20;
+
+    let mut boxlist = Vec::<Arc<dyn Hittable>>::with_capacity((NUM_BOXES * NUM_BOXES) as usize);
+
+    (0..NUM_BOXES).for_each(|i| {
+        (0..NUM_BOXES).for_each(|j| {
+            let w = 100_f32;
+            let x0 = -1000_f32 + i as f32 * w;
+            let z0 = -1000_f32 + j as f32 * w;
+            let y0 = 0_f32;
+            let x1 = x0 + w;
+            let y1 = rng.gen_range(1f32, 101f32);
+            let z1 = z0 + w;
+
+            boxlist.push(Arc::new(Block::new(
+                Vec3::new(x0, y0, z0),
+                Vec3::new(x1, y1, z1),
+                ground.clone(),
+            )));
+        });
+    });
+
+    world.add(BvhNode::new(boxlist.as_mut_slice(), 0_f32, 1_f32));
+
+    let light = Arc::new(DiffuseLight::from((7f32, 7f32, 7f32)));
+
+    world.add(Arc::new(XZRect {
+        x0: 123_f32,
+        x1: 423_f32,
+        z0: 147_f32,
+        z1: 412_f32,
+        k: 554_f32,
+        mtl: light.clone(),
+    }));
+
+    let center = Vec3::new(400_f32, 400_f32, 200_f32);
+
+    world.add(Arc::new(MovingSphere::new(
+        center,
+        center + Vec3::new(30_f32, 0_f32, 0_f32),
+        0_f32,
+        1_f32,
+        50_f32,
+        Arc::new(Lambertian::new((0.7_f32, 0.3_f32, 0.1_f32))),
+    )));
+
+    world.add(Arc::new(Sphere::new(
+        Vec3::new(260_f32, 150_f32, 45_f32),
+        50_f32,
+        Arc::new(Dielectric::new(1.5_f32)),
+    )));
+
+    world.add(Arc::new(Sphere::new(
+        Vec3::new(0_f32, 150_f32, 145_f32),
+        50_f32,
+        Arc::new(Metal::new((0.8_f32, 0.8_f32, 0.9_f32), 10_f32)),
+    )));
+
+    let boundary = Arc::new(Sphere::new(
+        Vec3::new(360_f32, 150_f32, 145_f32),
+        70_f32,
+        Arc::new(Dielectric::new(1.5_f32)),
+    ));
+    world.add(boundary.clone());
+
+    world.add(Arc::new(ConstantMedium::from_colored_object(
+        boundary.clone(),
+        (0.2_f32, 0.4_f32, 0.9_f32),
+        0.2_f32,
+    )));
+
+    let boundary = Arc::new(Sphere::new(
+        Vec3::broadcast(0_f32),
+        5000_f32,
+        Arc::new(Dielectric::new(1.5_f32)),
+    ));
+    world.add(Arc::new(ConstantMedium::from_colored_object(
+        boundary.clone(),
+        Vec3::broadcast(1_f32),
+        0.0001_f32,
+    )));
+
+    let emat = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/misc/earthmap.jpg",
+    ))));
+    world.add(Arc::new(Sphere::new(
+        (400f32, 200f32, 400f32).into(),
+        100f32,
+        emat,
+    )));
+
+    let pertex = Arc::new(NoiseTexture::new(0.1_f32));
+    world.add(Arc::new(Sphere::new(
+        Vec3::new(220_f32, 280_f32, 300_f32),
+        80_f32,
+        Arc::new(Lambertian::from_texture(pertex)),
+    )));
+
+    const NUM_SPHERES: i32 = 1000;
+
+    let mut boxlist2 = (0..NUM_SPHERES)
+        .map(|_| -> Arc<dyn Hittable> {
+            let center = Vec3::new(
+                165_f32 * random_real(),
+                165_f32 * random_real(),
+                165_f32 * random_real(),
+            );
+
+            Arc::new(Sphere::new(center, 10f32, white.clone()))
+        })
+        .collect::<Vec<Arc<dyn Hittable>>>();
+
+    let node = BvhNode::new(boxlist2.as_mut_slice(), 0f32, 1f32);
+    let node = Arc::new(RotateY::new(node, 15f32));
+    let node = Arc::new(Translate {
+        obj: node,
+        offset: (-100f32, 270f32, 395f32).into(),
+    });
+
+    world.add(node);
+
+    // let cam_params = {
+    //     let mut cp = CameraParameters::default();
+    //     cp.lookfrom = Vec3::new(478_f32, 278f32, -600_f32);
+    //     cp.lookat = Vec3::new(278_f32, 278_f32, 0_f32);
+    //     cp.world_up = Vec3::new(0_f32, 1_f32, 0_f32);
+    //     cp.focus_dist = 10_f32;
+    //     cp.aperture = 0_f32;
+    //     cp.field_of_view = 40_f32;
+    //     cp.time0 = 0_f32;
+    //     cp.time1 = 1_f32;
+
+    //     cp
+    // };
+
+    // (Arc::new(world), cam_params)
+    world
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct RaytracerParams {
     workers: i32,
@@ -731,7 +880,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(scene_cornell_box_smoke());
+        let world = Arc::new(final_scene());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =

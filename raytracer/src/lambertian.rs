@@ -10,7 +10,10 @@ pub struct Lambertian {
 }
 
 impl Lambertian {
-    pub fn new(albedo: Color) -> Lambertian {
+    pub fn new<T>(albedo: T) -> Lambertian
+    where
+        T: Into<Color>,
+    {
         Lambertian {
             albedo: std::sync::Arc::new(SolidColorTexture::new(albedo)),
         }

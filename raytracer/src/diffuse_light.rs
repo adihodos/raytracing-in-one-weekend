@@ -9,14 +9,19 @@ pub struct DiffuseLight {
 }
 
 impl DiffuseLight {
-    pub fn with_color<C: std::convert::Into<Color>>(c: C) -> Self {
-        Self {
-            emit: Arc::new(SolidColorTexture::new(c)),
-        }
-    }
-
     pub fn with_texture(emit: Arc<dyn Texture>) -> Self {
         Self { emit }
+    }
+}
+
+impl<T> std::convert::From<T> for DiffuseLight
+where
+    T: Into<Color>,
+{
+    fn from(color: T) -> Self {
+        Self {
+            emit: Arc::new(SolidColorTexture::new(color)),
+        }
     }
 }
 

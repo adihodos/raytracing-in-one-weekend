@@ -9,8 +9,11 @@ pub struct Metal {
 }
 
 impl Metal {
-    pub fn new(albedo: Color, fuzziness: Real) -> Metal {
-        Metal { albedo, fuzziness }
+    pub fn new<T: Into<Color>>(albedo: T, fuzziness: Real) -> Metal {
+        Metal {
+            albedo: albedo.into(),
+            fuzziness,
+        }
     }
 }
 
