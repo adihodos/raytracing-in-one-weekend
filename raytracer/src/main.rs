@@ -261,7 +261,8 @@ struct RaytracerState {
     total_workblocks: u32,
     image_pixels: Vec<Color>,
     cancel_token: Arc<std::sync::atomic::AtomicBool>,
-    start_time: std::time::Instant,
+    timestamp: std::time::Instant,
+    raytracing_time: std::time::Duration,
 }
 
 impl std::ops::Drop for RaytracerState {
@@ -414,7 +415,8 @@ impl RaytracerState {
             workblocks_done,
             image_pixels,
             cancel_token,
-            start_time: std::time::Instant::now(),
+            timestamp: std::time::Instant::now(),
+            raytracing_time: std::time::Duration::from_millis(0),
         }
     }
 
@@ -451,7 +453,7 @@ impl RaytracerState {
     }
 }
 
-struct Main {
+struct MainWindow {
     raytracer: RaytracerState,
     rtgl: RaytracingGlState,
     ui: UiBackend,
@@ -460,8 +462,8 @@ struct Main {
     events: Receiver<(f64, glfw::WindowEvent)>,
 }
 
-impl Main {
-    fn new() -> Main {
+impl MainWindow {
+    fn new() -> MainWindow {
         let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).expect("Failed to initialize GLFW");
 
         use glfw::WindowHint;
@@ -493,7 +495,7 @@ impl Main {
             raytracer.params.image_height as u32,
         );
 
-        Main {
+        MainWindow {
             ui,
             raytracer,
             rtgl,
@@ -540,7 +542,7 @@ impl Main {
             .workblocks_done
             .load(std::sync::atomic::Ordering::SeqCst);
         let total_work = self.raytracer.total_workblocks;
-        let elapsed = self.raytracer.start_time.elapsed();
+        let elapsed = self.raytracer.raytracing_time;
 
         ui.window("Raytracer status")
             .size([400f32, 600f32], imgui::Condition::FirstUseEver)
@@ -555,13 +557,11 @@ impl Main {
 
                 ui.separator();
                 ui.text(format!("Worker threads: {}", p.workers));
-
-                ui.separator();
+                ui.text(format!("Randomized workloads: {}", p.shuffle_workblocks));
                 imgui::ProgressBar::new(work_done as f32 / total_work as f32)
                     .overlay_text(format!(
-                        "Pixels raytraced {}/{}",
-                        p.worker_block_pixels * p.worker_block_pixels * work_done,
-                        p.image_width * p.image_height
+                        "Pixel blocks raytraced {}/{}",
+                        work_done, total_work
                     ))
                     .build(&ui);
 
@@ -586,6 +586,10 @@ impl Main {
         };
 
         if !self.raytracer.raytracing_finished() {
+            let current_timestamp = std::time::Instant::now();
+            self.raytracer.raytracing_time += current_timestamp - self.raytracer.timestamp;
+            self.raytracer.timestamp = current_timestamp;
+
             self.rtgl.update_texture(self.raytracer.get_image_pixels());
         }
         self.rtgl.render(&frame_context);
@@ -598,14 +602,7 @@ impl Main {
 }
 
 fn main() -> std::result::Result<(), String> {
-    // let start_time = std::time::Instant::now();
-    // let raytraced_pixels = raytrace_mt(params, make_random_world());
-    // let render_duration = start_time.elapsed();
-
-    // let minutes = render_duration.as_secs() / 60u64;
-    // let seconds = (render_duration - std::time::Duration::from_secs(minutes * 60u64)).as_secs();
-
-    let mut main_window = Main::new();
+    let mut main_window = MainWindow::new();
     main_window.main_loop();
 
     Ok(())
