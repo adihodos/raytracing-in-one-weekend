@@ -20,12 +20,14 @@ mod block;
 mod bvh;
 mod camera;
 mod checker_texture;
+mod constant_medium;
 mod dielectric;
 mod diffuse_light;
 mod generic_handle;
 mod hittable;
 mod hittable_list;
 mod image_texture;
+mod isotropic;
 mod lambertian;
 mod material;
 mod metal;
@@ -35,7 +37,7 @@ mod perlin;
 mod rectangles;
 mod solid_color_texture;
 mod texture;
-
+mod transform;
 mod types;
 
 use dielectric::Dielectric;
@@ -54,8 +56,10 @@ use ui::UiBackend;
 
 use crate::{
     block::Block,
+    constant_medium::ConstantMedium,
     objects::sphere::MovingSphere,
     rectangles::{XZRect, YZRect},
+    transform::{RotateY, Translate},
 };
 
 const COLOR_CLAMP_MIN: Real = 0 as Real;
@@ -436,16 +440,189 @@ fn scene_cornell_box() -> HittableList {
         mtl: light,
     }));
 
-    world.add(Arc::new(Block::new(
-        (130f32, 0f32, 65f32),
-        (295f32, 165f32, 230f32),
+    let box1 = Arc::new(Block::new(
+        (0f32, 0f32, 0f32),
+        (165f32, 330f32, 165f32),
         colors[1].clone(),
+    ));
+    let box1 = Arc::new(RotateY::new(box1, 15f32));
+    let box1 = Arc::new(Translate {
+        obj: box1,
+        offset: (265f32, 0f32, 295f32).into(),
+    });
+    world.add(box1);
+
+    let box2 = Arc::new(Block::new(
+        (0f32, 0f32, 0f32),
+        (165f32, 165f32, 165f32),
+        colors[1].clone(),
+    ));
+    let box2 = Arc::new(RotateY::new(box2, -18f32));
+    let box2 = Arc::new(Translate {
+        obj: box2,
+        offset: (130f32, 0f32, 65f32).into(),
+    });
+    world.add(box2);
+
+    world
+}
+
+fn scene_cornell_box_smoke() -> HittableList {
+    let colors = [
+        (0.65f32, 0.05f32, 0.05f32),
+        (0.73f32, 0.73f32, 0.73f32),
+        (0.12f32, 0.45f32, 0.15f32),
+    ]
+    .iter()
+    .map(|color| Arc::new(Lambertian::new((*color).into())))
+    .collect::<Vec<_>>();
+
+    let light = Arc::new(DiffuseLight::with_color((7f32, 7f32, 7f32)));
+
+    enum WallType {
+        XZ,
+        YZ,
+        XY,
+    }
+    struct WallData {
+        wt: WallType,
+        a: f32,
+        b: f32,
+        c: f32,
+        d: f32,
+        k: f32,
+        color_id: usize,
+    }
+
+    let mut world: HittableList = HittableList::from_iter(
+        [
+            WallData {
+                wt: WallType::YZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 555f32,
+                color_id: 2,
+            },
+            //
+            // yz_rect>(0, 555, 0, 555, 0, red)
+            WallData {
+                wt: WallType::YZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 0f32,
+                color_id: 0,
+            },
+            //
+            // xz_rect>(0, 555, 0, 555, 0, white)
+            WallData {
+                wt: WallType::XZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 0f32,
+                color_id: 1,
+            },
+            //
+            // xz_rect>(0, 555, 0, 555, 555, white)
+            WallData {
+                wt: WallType::XZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 555f32,
+                color_id: 1,
+            },
+            //
+            // xy_rect>(0, 555, 0, 555, 555, white)
+            WallData {
+                wt: WallType::XY,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 555f32,
+                color_id: 1,
+            },
+        ]
+        .iter()
+        .map(|wd| -> Arc<dyn Hittable> {
+            match wd.wt {
+                WallType::XY => Arc::new(XYRect {
+                    x0: wd.a,
+                    x1: wd.b,
+                    y0: wd.c,
+                    y1: wd.d,
+                    k: wd.k,
+                    mtl: colors[wd.color_id].clone(),
+                }),
+                WallType::XZ => Arc::new(XZRect {
+                    x0: wd.a,
+                    x1: wd.b,
+                    z0: wd.c,
+                    z1: wd.d,
+                    k: wd.k,
+                    mtl: colors[wd.color_id].clone(),
+                }),
+
+                WallType::YZ => Arc::new(YZRect {
+                    y0: wd.a,
+                    y1: wd.b,
+                    z0: wd.c,
+                    z1: wd.d,
+                    k: wd.k,
+                    mtl: colors[wd.color_id].clone(),
+                }),
+            }
+        }),
+    );
+
+    world.add(Arc::new(XZRect {
+        x0: 113f32,
+        x1: 443f32,
+        z0: 127f32,
+        z1: 432f32,
+        k: 554f32,
+        mtl: light,
+    }));
+
+    let box1 = Arc::new(Block::new(
+        (0f32, 0f32, 0f32),
+        (165f32, 330f32, 165f32),
+        colors[1].clone(),
+    ));
+    let box1 = Arc::new(RotateY::new(box1, 15f32));
+    let box1 = Arc::new(Translate {
+        obj: box1,
+        offset: (265f32, 0f32, 295f32).into(),
+    });
+
+    world.add(Arc::new(ConstantMedium::from_colored_object(
+        box1,
+        (0f32, 0f32, 0f32),
+        0.01f32,
     )));
 
-    world.add(Arc::new(Block::new(
-        (265f32, 0f32, 295f32),
-        (430f32, 330f32, 460f32),
+    let box2 = Arc::new(Block::new(
+        (0f32, 0f32, 0f32),
+        (165f32, 165f32, 165f32),
         colors[1].clone(),
+    ));
+    let box2 = Arc::new(RotateY::new(box2, -18f32));
+    let box2 = Arc::new(Translate {
+        obj: box2,
+        offset: (130f32, 0f32, 65f32).into(),
+    });
+
+    world.add(Arc::new(ConstantMedium::from_colored_object(
+        box2,
+        (1f32, 1f32, 1f32),
+        0.01f32,
     )));
 
     world
@@ -554,7 +731,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(scene_cornell_box());
+        let world = Arc::new(scene_cornell_box_smoke());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =

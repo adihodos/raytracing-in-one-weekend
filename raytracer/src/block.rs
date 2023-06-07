@@ -5,7 +5,7 @@ use crate::{
     hittable_list::HittableList,
     material::Material,
     rectangles::{XYRect, XZRect, YZRect},
-    types::{Color, Point},
+    types::Point,
 };
 
 pub struct Block {
