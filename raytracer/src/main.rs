@@ -1,13 +1,16 @@
 #![allow(dead_code)]
 
 use std::{
+    iter::FromIterator,
     os::raw::c_void,
     sync::{mpsc::Receiver, Arc},
 };
 
 use checker_texture::CheckerTexture;
+use diffuse_light::DiffuseLight;
 use image_texture::ImageTexture;
 use noise_texture::NoiseTexture;
+use rectangles::XYRect;
 use serde::{Deserialize, Serialize};
 
 mod ui;
@@ -28,6 +31,7 @@ mod metal;
 mod noise_texture;
 mod objects;
 mod perlin;
+mod rectangles;
 mod solid_color_texture;
 mod texture;
 
@@ -47,7 +51,10 @@ use types::*;
 use glfw::Context;
 use ui::UiBackend;
 
-use crate::objects::sphere::MovingSphere;
+use crate::{
+    objects::sphere::MovingSphere,
+    rectangles::{XZRect, YZRect},
+};
 
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
@@ -116,13 +123,6 @@ fn ray_color(r: &Ray, background: Color, world: &HittableList, depth: i32) -> Co
     } else {
         return background;
     }
-
-    // use math::vec3::normalize;
-    // let unit_direction = normalize(r.direction);
-    // let t = 0.5 as Real * (unit_direction.y + 1 as Real);
-
-    // (1 as Real - t) * Color::broadcast(1 as Real)
-    //     + t * Color::new(0.5 as Real, 0.7 as Real, 1 as Real)
 }
 
 fn scene_random_world() -> HittableList {
@@ -274,6 +274,169 @@ fn scene_textured_spheres() -> HittableList {
     world
 }
 
+fn scene_simple_light() -> HittableList {
+    let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new(3f32))));
+
+    let mut world = HittableList::new();
+
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, -1000f32, 0f32),
+        1000f32,
+        noise_mtl.clone(),
+    )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, 2f32, 0f32),
+        2f32,
+        noise_mtl.clone(),
+    )));
+
+    let diffuse_light = Arc::new(DiffuseLight::with_color((4f32, 4f32, 4f32)));
+    world.add(Arc::new(XYRect {
+        x0: 3f32,
+        x1: 5f32,
+        y0: 1f32,
+        y1: 3f32,
+        k: -2f32,
+        mtl: diffuse_light,
+    }));
+
+    let red_light = Arc::new(DiffuseLight::with_color((4f32, 2f32, 0f32)));
+    world.add(Arc::new(Sphere::new(
+        Point::new(0f32, 8f32, 0f32),
+        2f32,
+        red_light,
+    )));
+
+    world
+}
+
+fn scene_cornell_box() -> HittableList {
+    let colors = [
+        (0.65f32, 0.05f32, 0.05f32),
+        (0.73f32, 0.73f32, 0.73f32),
+        (0.12f32, 0.45f32, 0.15f32),
+    ]
+    .iter()
+    .map(|color| Arc::new(Lambertian::new((*color).into())))
+    .collect::<Vec<_>>();
+
+    let light = Arc::new(DiffuseLight::with_color((15f32, 15f32, 15f32)));
+
+    enum WallType {
+        XZ,
+        YZ,
+        XY,
+    }
+    struct WallData {
+        wt: WallType,
+        a: f32,
+        b: f32,
+        c: f32,
+        d: f32,
+        k: f32,
+        color_id: usize,
+    }
+
+    let mut world: HittableList = HittableList::from_iter(
+        [
+            WallData {
+                wt: WallType::YZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 555f32,
+                color_id: 2,
+            },
+            //
+            // yz_rect>(0, 555, 0, 555, 0, red)
+            WallData {
+                wt: WallType::YZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 0f32,
+                color_id: 0,
+            },
+            //
+            // xz_rect>(0, 555, 0, 555, 0, white)
+            WallData {
+                wt: WallType::XZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 0f32,
+                color_id: 1,
+            },
+            //
+            // xz_rect>(0, 555, 0, 555, 555, white)
+            WallData {
+                wt: WallType::XZ,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 555f32,
+                color_id: 1,
+            },
+            //
+            // xy_rect>(0, 555, 0, 555, 555, white)
+            WallData {
+                wt: WallType::XY,
+                a: 0f32,
+                b: 555f32,
+                c: 0f32,
+                d: 555f32,
+                k: 555f32,
+                color_id: 1,
+            },
+        ]
+        .iter()
+        .map(|wd| -> Arc<dyn Hittable> {
+            match wd.wt {
+                WallType::XY => Arc::new(XYRect {
+                    x0: wd.a,
+                    x1: wd.b,
+                    y0: wd.c,
+                    y1: wd.d,
+                    k: wd.k,
+                    mtl: colors[wd.color_id].clone(),
+                }),
+                WallType::XZ => Arc::new(XZRect {
+                    x0: wd.a,
+                    x1: wd.b,
+                    z0: wd.c,
+                    z1: wd.d,
+                    k: wd.k,
+                    mtl: colors[wd.color_id].clone(),
+                }),
+
+                WallType::YZ => Arc::new(YZRect {
+                    y0: wd.a,
+                    y1: wd.b,
+                    z0: wd.c,
+                    z1: wd.d,
+                    k: wd.k,
+                    mtl: colors[wd.color_id].clone(),
+                }),
+            }
+        }),
+    );
+
+    world.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light,
+    }));
+
+    world
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct RaytracerParams {
     workers: i32,
@@ -377,7 +540,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(scene_two_perlin_spheres());
+        let world = Arc::new(scene_cornell_box());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =
