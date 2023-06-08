@@ -133,6 +133,18 @@ pub fn random_in_unit_disk() -> Vec3 {
     }
 }
 
+pub fn random_cosine_direction() -> Vec3 {
+    let r1 = random_real();
+    let r2 = random_real();
+    let z = (1 as Real - r2).sqrt();
+
+    let phi = (2.0 * std::f64::consts::PI) as Real * r1;
+    let x = phi.cos() * r2.sqrt();
+    let y = phi.sin() * r2.sqrt();
+
+    Vec3 { x, y, z }
+}
+
 pub fn schlick(cosine: Real, refraction_index: Real) -> Real {
     let r0 = (1 as Real - refraction_index) / (1 as Real + refraction_index);
     let r0 = r0 * r0;

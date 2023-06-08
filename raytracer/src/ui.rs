@@ -1,6 +1,6 @@
 use std::{ffi::c_void, mem::size_of, ptr::null};
 
-use glfw::{CursorMode, MouseButton, WindowEvent};
+use glfw::{MouseButton, WindowEvent};
 use rendering::{
     create_shader_program_from_string, gl, OpenGLStateSnapshot, UniqueBuffer, UniqueBufferMapping,
     UniquePipeline, UniqueSampler, UniqueShaderProgram, UniqueTexture, UniqueVertexArray,

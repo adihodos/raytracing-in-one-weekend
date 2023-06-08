@@ -33,6 +33,7 @@ mod material;
 mod metal;
 mod noise_texture;
 mod objects;
+mod onb;
 mod perlin;
 mod rectangles;
 mod solid_color_texture;

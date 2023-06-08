@@ -11,7 +11,12 @@ pub struct ScatterRecord {
 pub trait Material: Send + Sync {
     fn scatter(&self, ray: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord>;
 
-    fn scattering_pdf(&self, ray: &Ray, hit_record: &HitRecord, scattered: &ScatterRecord) -> Real {
+    fn scattering_pdf(
+        &self,
+        _ray: &Ray,
+        _hit_record: &HitRecord,
+        _scattered: &ScatterRecord,
+    ) -> Real {
         0 as Real
     }
 
