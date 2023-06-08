@@ -2,6 +2,7 @@ use math::vec3::{cross, normalize};
 
 use crate::types::{Real, Vec3};
 
+#[derive(Copy, Clone, Debug)]
 pub struct Onb {
     axis: [Vec3; 3],
 }

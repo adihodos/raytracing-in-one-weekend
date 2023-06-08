@@ -44,4 +44,11 @@ impl HitRecord {
 pub trait Hittable: Send + Sync {
     fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord>;
     fn bounding_box(&self, time0: Real, time1: Real) -> Option<Aabb>;
+    fn pdf_value(&self, _o: Point, _v: Vec3) -> Real {
+        0 as Real
+    }
+
+    fn random(&self, _v: Vec3) -> Vec3 {
+        math::vec3::consts::unit_x()
+    }
 }

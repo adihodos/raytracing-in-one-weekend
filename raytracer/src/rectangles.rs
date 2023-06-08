@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use math::vec3::{dot, length, length_squared};
+
 use crate::{
     aabb3::Aabb,
     hittable::{HitRecord, Hittable},
     material::Material,
-    types::{Ray, Real, Vec3},
+    types::{random_real_range, Ray, Real, Vec3},
 };
 
 pub struct XYRect {
@@ -47,6 +49,31 @@ impl Hittable for XYRect {
             Vec3::new(self.x0, self.y0, self.k - 0.0001 as Real),
             Vec3::new(self.x1, self.y1, self.k + 0.0001 as Real),
         ))
+    }
+
+    fn pdf_value(&self, origin: crate::types::Point, v: Vec3) -> Real {
+        self.hit(
+            &Ray::new(origin, v, 0 as Real),
+            0.001 as Real,
+            std::f32::MAX as Real,
+        )
+        .map_or(0 as Real, |hit_rec| {
+            let area = (self.x1 - self.x0) * (self.y1 - self.y0);
+            let distance_squared = hit_rec.t * hit_rec.t * length_squared(v);
+            let cosine = (dot(v, hit_rec.normal) / length(v)).abs();
+
+            distance_squared / (cosine * area)
+        })
+    }
+
+    fn random(&self, origin: Vec3) -> Vec3 {
+        let random_point = Vec3 {
+            x: random_real_range(self.x0, self.x1),
+            y: random_real_range(self.y0, self.y1),
+            z: self.k,
+        };
+
+        random_point - origin
     }
 }
 
@@ -94,6 +121,31 @@ impl Hittable for XZRect {
             Vec3::new(self.x1, self.k + 0.0001 as Real, self.z1),
         ))
     }
+
+    fn pdf_value(&self, origin: crate::types::Point, v: Vec3) -> Real {
+        self.hit(
+            &Ray::new(origin, v, 0 as Real),
+            0.001 as Real,
+            std::f32::MAX as Real,
+        )
+        .map_or(0 as Real, |hit_rec| {
+            let area = (self.x1 - self.x0) * (self.z1 - self.z0);
+            let distance_squared = hit_rec.t * hit_rec.t * length_squared(v);
+            let cosine = (dot(v, hit_rec.normal) / length(v)).abs();
+
+            distance_squared / (cosine * area)
+        })
+    }
+
+    fn random(&self, origin: Vec3) -> Vec3 {
+        let random_point = Vec3 {
+            x: random_real_range(self.x0, self.x1),
+            y: self.k,
+            z: random_real_range(self.z0, self.z1),
+        };
+
+        random_point - origin
+    }
 }
 
 //
@@ -138,5 +190,30 @@ impl Hittable for YZRect {
             Vec3::new(self.k - 0.0001 as Real, self.y0, self.z0),
             Vec3::new(self.k + 0.0001 as Real, self.y1, self.z1),
         ))
+    }
+
+    fn pdf_value(&self, origin: crate::types::Point, v: Vec3) -> Real {
+        self.hit(
+            &Ray::new(origin, v, 0 as Real),
+            0.001 as Real,
+            std::f32::MAX as Real,
+        )
+        .map_or(0 as Real, |hit_rec| {
+            let area = (self.y1 - self.y0) * (self.z1 - self.z0);
+            let distance_squared = hit_rec.t * hit_rec.t * length_squared(v);
+            let cosine = (dot(v, hit_rec.normal) / length(v)).abs();
+
+            distance_squared / (cosine * area)
+        })
+    }
+
+    fn random(&self, origin: Vec3) -> Vec3 {
+        let random_point = Vec3 {
+            x: self.k,
+            y: random_real_range(self.y0, self.y1),
+            z: random_real_range(self.z0, self.z1),
+        };
+
+        random_point - origin
     }
 }

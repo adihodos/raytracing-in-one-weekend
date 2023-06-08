@@ -9,7 +9,9 @@ use std::{
 use checker_texture::CheckerTexture;
 use diffuse_light::DiffuseLight;
 use image_texture::ImageTexture;
+use material::ScatterRecord;
 use noise_texture::NoiseTexture;
+use pdf::{CosinePdf, HittablePdf, Pdf};
 use rectangles::XYRect;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +25,7 @@ mod checker_texture;
 mod constant_medium;
 mod dielectric;
 mod diffuse_light;
+mod flip_face;
 mod generic_handle;
 mod hittable;
 mod hittable_list;
@@ -34,6 +37,7 @@ mod metal;
 mod noise_texture;
 mod objects;
 mod onb;
+mod pdf;
 mod perlin;
 mod rectangles;
 mod solid_color_texture;
@@ -59,6 +63,7 @@ use crate::{
     block::Block,
     bvh::BvhNode,
     constant_medium::ConstantMedium,
+    flip_face::FlipFace,
     objects::sphere::MovingSphere,
     rectangles::{XZRect, YZRect},
     transform::{RotateY, Translate},
@@ -67,18 +72,38 @@ use crate::{
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
 
-fn ray_color(r: &Ray, background: Color, world: &HittableList, depth: i32) -> Color {
+fn ray_color(
+    r: &Ray,
+    background: Color,
+    world: &HittableList,
+    lights: Arc<dyn Hittable>,
+    depth: i32,
+) -> Color {
     if depth <= 0 {
         return Color::broadcast(0 as Real);
     }
 
     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
-        let emitted = rec.mtl.emitted(rec.u, rec.v, rec.p);
+        let emitted = rec.mtl.emitted(r, &rec, rec.u, rec.v, rec.p);
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
+            let light_pdf = HittablePdf {
+                obj: lights.clone(),
+                origin: rec.p,
+            };
+
+            // let p: CosinePdf = rec.normal.into();
+
+            let scattered_ray = Ray::new(rec.p, light_pdf.generate(), r.time);
+            let scatter = ScatterRecord {
+                ray: scattered_ray,
+                pdf: light_pdf.value(scattered_ray.direction),
+                ..scatter
+            };
+
             return emitted
                 + scatter.albedo
                     * rec.mtl.scattering_pdf(r, &rec, &scatter)
-                    * ray_color(&scatter.ray, background, world, depth - 1)
+                    * ray_color(&scatter.ray, background, world, lights, depth - 1)
                     / scatter.pdf;
         } else {
             return emitted;
@@ -283,8 +308,6 @@ fn scene_cornell_box() -> HittableList {
     .map(|color| Arc::new(Lambertian::new(*color)))
     .collect::<Vec<_>>();
 
-    let light: Arc<DiffuseLight> = Arc::new((15f32, 15f32, 15f32).into());
-
     enum WallType {
         XZ,
         YZ,
@@ -388,14 +411,18 @@ fn scene_cornell_box() -> HittableList {
         }),
     );
 
-    world.add(Arc::new(XZRect {
-        x0: 213f32,
-        x1: 343f32,
-        z0: 227f32,
-        z1: 332f32,
-        k: 554f32,
-        mtl: light,
-    }));
+    let light_mtl: Arc<DiffuseLight> = Arc::new((15f32, 15f32, 15f32).into());
+    let light = Arc::new(FlipFace {
+        obj: Arc::new(XZRect {
+            x0: 213f32,
+            x1: 343f32,
+            z0: 227f32,
+            z1: 332f32,
+            k: 554f32,
+            mtl: light_mtl,
+        }),
+    });
+    world.add(light);
 
     let box1 = Arc::new(Block::new(
         (0f32, 0f32, 0f32),
@@ -844,6 +871,18 @@ impl RaytracerState {
         let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
         let cancel_token = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
+        let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+        let light = Arc::new(XZRect {
+            x0: 213f32,
+            x1: 343f32,
+            z0: 227f32,
+            z1: 332f32,
+            k: 554f32,
+            mtl: light_mtl,
+        });
+
+        // let lights =
+
         let workers = (0..params.workers)
             .map(|worker_idx| {
                 let workblocks = Arc::clone(&workblocks);
@@ -855,6 +894,7 @@ impl RaytracerState {
                 };
                 let workblocks_done = Arc::clone(&workblocks_done);
                 let cancel_token = Arc::clone(&cancel_token);
+                let light = light.clone();
 
                 std::thread::spawn(move || loop {
                     if cancel_token.load(std::sync::atomic::Ordering::SeqCst) {
@@ -892,6 +932,7 @@ impl RaytracerState {
                                                     &r,
                                                     params.background.into(),
                                                     &world,
+                                                    light.clone(),
                                                     params.max_ray_depth,
                                                 )
                                         },

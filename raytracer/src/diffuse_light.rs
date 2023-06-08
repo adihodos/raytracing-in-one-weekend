@@ -1,7 +1,13 @@
 use std::sync::Arc;
 
+use math::ray;
+
 use crate::{
-    material::Material, solid_color_texture::SolidColorTexture, texture::Texture, types::Color,
+    hittable::HitRecord,
+    material::Material,
+    solid_color_texture::SolidColorTexture,
+    texture::Texture,
+    types::{Color, Ray, Real},
 };
 
 pub struct DiffuseLight {
@@ -36,10 +42,16 @@ impl Material for DiffuseLight {
 
     fn emitted(
         &self,
+        ray: &Ray,
+        hit_rec: &HitRecord,
         u: crate::types::Real,
         v: crate::types::Real,
         point: crate::types::Point,
     ) -> Color {
-        self.emit.value(u, v, point)
+        if hit_rec.front_face {
+            self.emit.value(u, v, point)
+        } else {
+            Color::broadcast(0 as Real)
+        }
     }
 }

@@ -20,7 +20,14 @@ pub trait Material: Send + Sync {
         0 as Real
     }
 
-    fn emitted(&self, _u: Real, _v: Real, _point: Point) -> Color {
+    fn emitted(
+        &self,
+        _ray: &Ray,
+        _hit_record: &HitRecord,
+        _u: Real,
+        _v: Real,
+        _point: Point,
+    ) -> Color {
         Color::broadcast(0 as Real)
     }
 }
