@@ -60,60 +60,11 @@ use crate::{
     constant_medium::ConstantMedium,
     objects::sphere::MovingSphere,
     rectangles::{XZRect, YZRect},
-    solid_color_texture::SolidColorTexture,
     transform::{RotateY, Translate},
 };
 
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
-
-fn write_png<P: AsRef<std::path::Path>>(
-    file_path: P,
-    img_width: u32,
-    img_height: u32,
-    samples_per_pixel: i32,
-    pixels: &[Color],
-) -> std::io::Result<()> {
-    //
-    // gamma correct anb transform to 8bpp color
-    let pixels_rgb = pixels
-        .iter()
-        .map(|color| {
-            let (r, g, b) = math::vec3::sqrt(*color * (1 as Real / samples_per_pixel as Real))
-                // gamma correct for gamma = 2.0
-                .into();
-
-            (
-                (256 as Real * clamp(r, COLOR_CLAMP_MIN, COLOR_CLAMP_MAX)) as u8,
-                (256 as Real * clamp(g, COLOR_CLAMP_MIN, COLOR_CLAMP_MAX)) as u8,
-                (256 as Real * clamp(b, COLOR_CLAMP_MIN, COLOR_CLAMP_MAX)) as u8,
-            )
-        })
-        .collect::<Vec<_>>();
-
-    use std::fs::File;
-    use std::io::BufWriter;
-
-    let out_file = File::create(file_path)?;
-    let ref mut file_writer = BufWriter::new(out_file);
-    let mut png_encoder = png::Encoder::new(file_writer, img_width, img_height);
-    png_encoder.set_color(png::ColorType::RGB);
-    png_encoder.set_depth(png::BitDepth::Eight);
-
-    png_encoder
-        .write_header()
-        .and_then(|mut png_writer| {
-            png_writer.write_image_data(unsafe {
-                std::slice::from_raw_parts(pixels_rgb.as_ptr() as *const u8, pixels_rgb.len() * 3)
-            })
-        })
-        .map_err(|encoding_err| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("PNG encoding error: {}", encoding_err),
-            )
-        })
-}
 
 fn ray_color(r: &Ray, background: Color, world: &HittableList, depth: i32) -> Color {
     if depth <= 0 {
@@ -880,7 +831,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(final_scene());
+        let world = Arc::new(scene_cornell_box());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =
@@ -1026,6 +977,7 @@ struct MainWindow {
     glfw: glfw::Glfw,
     window: glfw::Window,
     events: Receiver<(f64, glfw::WindowEvent)>,
+    queue_screenshot: bool,
 }
 
 impl MainWindow {
@@ -1068,6 +1020,7 @@ impl MainWindow {
             glfw,
             window,
             events,
+            queue_screenshot: false,
         }
     }
 
@@ -1080,6 +1033,39 @@ impl MainWindow {
             }
 
             self.update_loop();
+
+            if self.queue_screenshot {
+                let (img_width, img_height) = self.window.get_framebuffer_size();
+                let mut pixels = vec![0u8; (img_width * img_height * 3) as usize];
+
+                unsafe {
+                    gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
+                    gl::NamedFramebufferReadBuffer(0, gl::BACK);
+                    gl::ReadPixels(
+                        0,
+                        0,
+                        img_width,
+                        img_height,
+                        gl::RGB,
+                        gl::UNSIGNED_BYTE,
+                        pixels.as_mut_ptr() as *mut c_void,
+                    );
+                }
+
+                image::DynamicImage::ImageRgb8(
+                    image::RgbImage::from_vec(img_width as u32, img_height as u32, pixels)
+                        .expect("Failed to create image"),
+                )
+                .flipv()
+                .save(format!(
+                    "screenshots/raytraced_{}.png",
+                    chrono::Local::now().format("%Y_%m_%d_%H_%M_%S")
+                ))
+                .expect("Failed to save screenshot");
+
+                self.queue_screenshot = false;
+            }
+
             self.window.swap_buffers();
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
@@ -1092,6 +1078,10 @@ impl MainWindow {
             WindowEvent::Close => {
                 self.window.set_should_close(true);
                 self.raytracer.cancel_work();
+            }
+
+            WindowEvent::Key(glfw::Key::F12, _, glfw::Action::Press, _) => {
+                self.queue_screenshot = true;
             }
 
             _ => {
@@ -1109,10 +1099,23 @@ impl MainWindow {
             .load(std::sync::atomic::Ordering::SeqCst);
         let total_work = self.raytracer.total_workblocks;
         let elapsed = self.raytracer.raytracing_time;
+        let mut queue_screenshot = self.queue_screenshot;
 
         ui.window("Raytracer status")
             .size([400f32, 600f32], imgui::Condition::FirstUseEver)
             .build(|| {
+                let btn_color =
+                    ui.push_style_color(imgui::StyleColor::Button, [0f32, 1f32, 0f32, 1f32]);
+                let btn_color_active =
+                    ui.push_style_color(imgui::StyleColor::ButtonActive, [1f32, 0f32, 0f32, 1f32]);
+
+                if ui.button("Capture screenshot (F12)") {
+                    queue_screenshot = true;
+                }
+                btn_color.pop();
+                btn_color_active.pop();
+
+                ui.separator();
                 ui.text(format!("Image size: {}x{}", p.image_width, p.image_height));
                 ui.text(format!("Aspect ratio: {}", p.aspect_ratio));
                 ui.text(format!("Aperture: {}", p.aperture));
@@ -1136,6 +1139,8 @@ impl MainWindow {
                     format!("Time spent: {}", humantime::format_duration(elapsed)),
                 );
             });
+
+        self.queue_screenshot = queue_screenshot;
     }
 
     fn update_loop(&mut self) {
