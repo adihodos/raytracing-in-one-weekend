@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use math::vec3::{dot, normalize};
 
 use crate::hittable::HitRecord;
 use crate::material::{Material, ScatterRecord};
 use crate::onb::Onb;
+use crate::pdf::CosinePdf;
 use crate::solid_color_texture::SolidColorTexture;
 use crate::texture::Texture;
 use crate::types::{random_cosine_direction, Color, Ray, Real};
@@ -28,28 +31,19 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, ray: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
-        let uvw: Onb = hit_record.normal.into();
-        let scatter_direction = uvw.local_from_vec(random_cosine_direction());
-
-        let scattered_ray = Ray::new(hit_record.p, normalize(scatter_direction), ray.time);
+    fn scatter(&self, _ray: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
         let albedo = self.albedo.value(hit_record.u, hit_record.v, hit_record.p);
-        let pdf = dot(uvw.w(), scattered_ray.direction) / std::f32::consts::PI as Real;
 
-        Some(ScatterRecord {
-            ray: scattered_ray,
-            albedo,
-            pdf,
+        Some(ScatterRecord::PdfRec {
+            pdf: Arc::new(CosinePdf {
+                uvw: hit_record.normal.into(),
+            }),
+            attenuation: albedo,
         })
     }
 
-    fn scattering_pdf(
-        &self,
-        _ray: &Ray,
-        hit_record: &HitRecord,
-        scattered: &ScatterRecord,
-    ) -> Real {
-        let cosine = dot(hit_record.normal, normalize(scattered.ray.direction));
+    fn scattering_pdf(&self, _ray: &Ray, hit_record: &HitRecord, scattered: &Ray) -> Real {
+        let cosine = dot(hit_record.normal, normalize(scattered.direction));
         if cosine < 0f32 {
             0f32
         } else {

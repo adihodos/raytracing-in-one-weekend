@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::hittable::{HitRecord, Hittable};
-use crate::types::{Ray, Real};
+use crate::types::{random_int, Ray, Real};
 
 #[derive(Clone)]
 pub struct HittableList {
@@ -54,5 +54,23 @@ impl Hittable for HittableList {
             .iter()
             .filter_map(|object| object.bounding_box(time0, time1))
             .reduce(|accum_box, this_box| crate::aabb3::merge_aabbs(&accum_box, &this_box))
+    }
+
+    fn pdf_value(&self, o: crate::types::Point, v: crate::types::Vec3) -> Real {
+        if self.objects.is_empty() {
+            return 0 as Real;
+        }
+
+        let weight = 1 as Real / self.objects.len() as Real;
+
+        self.objects
+            .iter()
+            .fold(0 as Real, |sum, obj| sum + weight * obj.pdf_value(o, v))
+    }
+
+    fn random(&self, v: crate::types::Vec3) -> crate::types::Vec3 {
+        let num_objects = (self.objects.len() - 1) as i32;
+
+        self.objects[random_int(0, num_objects) as usize].random(v)
     }
 }

@@ -145,6 +145,18 @@ pub fn random_cosine_direction() -> Vec3 {
     Vec3 { x, y, z }
 }
 
+pub fn random_to_sphere(radius: Real, distance_squared: Real) -> Vec3 {
+    let r1 = random_real();
+    let r2 = random_real();
+    let z = 1 as Real + r2 * ((1 as Real - radius * radius / distance_squared).sqrt() - 1 as Real);
+
+    let phi = (2.0 * std::f64::consts::PI) as Real * r1;
+    let x = phi.cos() * (1 as Real - z * z).sqrt();
+    let y = phi.sin() * (1 as Real - z * z).sqrt();
+
+    Vec3 { x, y, z }
+}
+
 pub fn schlick(cosine: Real, refraction_index: Real) -> Real {
     let r0 = (1 as Real - refraction_index) / (1 as Real + refraction_index);
     let r0 = r0 * r0;

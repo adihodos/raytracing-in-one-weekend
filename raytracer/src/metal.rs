@@ -26,10 +26,9 @@ impl Material for Metal {
         let scattered = reflected + self.fuzziness * random_in_unit_sphere();
 
         if are_on_the_same_plane_side(scattered, hit_record.normal) {
-            Some(ScatterRecord {
+            Some(ScatterRecord::SpecularRec {
                 ray: Ray::new(hit_record.p, scattered, ray.time),
-                albedo: self.albedo,
-                pdf: 0 as Real,
+                attenuation: self.albedo,
             })
         } else {
             None

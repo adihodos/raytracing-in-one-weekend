@@ -3,7 +3,8 @@ use math::vec3::{self, length_squared};
 use crate::aabb3::Aabb;
 use crate::hittable::{HitRecord, Hittable};
 use crate::material::Material;
-use crate::types::{Point, Ray, Real};
+use crate::onb::Onb;
+use crate::types::{random_to_sphere, Point, Ray, Real};
 
 #[derive(Clone)]
 pub struct Sphere {
@@ -85,6 +86,29 @@ impl Hittable for Sphere {
             self.center - Point::broadcast(self.radius),
             self.center + Point::broadcast(self.radius),
         ))
+    }
+
+    fn pdf_value(&self, o: Point, v: crate::types::Vec3) -> Real {
+        self.hit(
+            &Ray::new(o, v, 0 as Real),
+            0.001 as Real,
+            std::f32::MAX as Real,
+        )
+        .map_or(0 as Real, |_| {
+            let cos_theta_max =
+                (1 as Real - self.radius * self.radius / length_squared(self.center - o)).sqrt();
+            let solid_angle =
+                2 as Real * std::f32::consts::PI as Real * (1 as Real - cos_theta_max);
+
+            return 1 as Real / solid_angle;
+        })
+    }
+
+    fn random(&self, v: crate::types::Vec3) -> crate::types::Vec3 {
+        let direction = self.center - v;
+        let distance_squared = length_squared(direction);
+        let uvw: Onb = direction.into();
+        uvw.local_from_vec(random_to_sphere(self.radius, distance_squared))
     }
 }
 

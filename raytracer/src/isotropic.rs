@@ -28,10 +28,9 @@ impl Material for Isotropic {
         _ray: &crate::types::Ray,
         hit_record: &crate::hittable::HitRecord,
     ) -> Option<crate::material::ScatterRecord> {
-        Some(ScatterRecord {
+        Some(ScatterRecord::SpecularRec {
             ray: Ray::new(hit_record.p, random_in_unit_sphere(), hit_record.t),
-            albedo: self.albedo.value(hit_record.u, hit_record.v, hit_record.p),
-            pdf: 0 as Real,
+            attenuation: self.albedo.value(hit_record.u, hit_record.v, hit_record.p),
         })
     }
 }

@@ -86,29 +86,27 @@ fn ray_color(
     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
         let emitted = rec.mtl.emitted(r, &rec, rec.u, rec.v, rec.p);
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
-            let light_pdf = HittablePdf {
-                obj: lights.clone(),
-                origin: rec.p,
+            return match scatter {
+                ScatterRecord::SpecularRec { ray, attenuation } => {
+                    attenuation * ray_color(&ray, background, world, lights, depth - 1)
+                }
+                ScatterRecord::PdfRec { pdf, attenuation } => {
+                    let light_pdf = HittablePdf {
+                        obj: lights.clone(),
+                        origin: rec.p,
+                    };
+
+                    let mixed_pdf = MixturePdf::new(Arc::new(light_pdf), pdf);
+                    let scattered_ray = Ray::new(rec.p, mixed_pdf.generate(), r.time);
+                    let pdf_val = mixed_pdf.value(scattered_ray.direction);
+
+                    emitted
+                        + attenuation
+                            * rec.mtl.scattering_pdf(r, &rec, &scattered_ray)
+                            * ray_color(&scattered_ray, background, world, lights, depth - 1)
+                            / pdf_val
+                }
             };
-
-            let cosine_pdf: CosinePdf = rec.normal.into();
-
-            let mixed_pdf = MixturePdf::new(Arc::new(light_pdf), Arc::new(cosine_pdf));
-
-            // let p: CosinePdf = rec.normal.into();
-
-            let scattered_ray = Ray::new(rec.p, mixed_pdf.generate(), r.time);
-            let scatter = ScatterRecord {
-                ray: scattered_ray,
-                pdf: mixed_pdf.value(scattered_ray.direction),
-                ..scatter
-            };
-
-            return emitted
-                + scatter.albedo
-                    * rec.mtl.scattering_pdf(r, &rec, &scatter)
-                    * ray_color(&scatter.ray, background, world, lights, depth - 1)
-                    / scatter.pdf;
         } else {
             return emitted;
         }
@@ -428,6 +426,8 @@ fn scene_cornell_box() -> HittableList {
     });
     world.add(light);
 
+    let aluminium = Arc::new(Metal::new((0.8f32, 0.85f32, 0.88f32), 0f32));
+
     let box1 = Arc::new(Block::new(
         (0f32, 0f32, 0f32),
         (165f32, 330f32, 165f32),
@@ -450,7 +450,11 @@ fn scene_cornell_box() -> HittableList {
         obj: box2,
         offset: (130f32, 0f32, 65f32).into(),
     });
-    world.add(box2);
+    // world.add(box2);
+
+    let glass = Arc::new(Dielectric::new(1.5f32));
+    let glass_sphere = Arc::new(Sphere::new((190f32, 90f32, 190f32).into(), 90f32, glass));
+    world.add(glass_sphere);
 
     world
 }
@@ -876,16 +880,22 @@ impl RaytracerState {
         let cancel_token = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
-        let light = Arc::new(XZRect {
+        let mut lights = HittableList::new();
+        lights.add(Arc::new(XZRect {
             x0: 213f32,
             x1: 343f32,
             z0: 227f32,
             z1: 332f32,
             k: 554f32,
-            mtl: light_mtl,
-        });
+            mtl: light_mtl.clone(),
+        }));
+        lights.add(Arc::new(Sphere::new(
+            (190f32, 90f32, 190f32).into(),
+            90f32,
+            light_mtl.clone(),
+        )));
 
-        // let lights =
+        let lights = Arc::new(lights);
 
         let workers = (0..params.workers)
             .map(|worker_idx| {
@@ -898,7 +908,7 @@ impl RaytracerState {
                 };
                 let workblocks_done = Arc::clone(&workblocks_done);
                 let cancel_token = Arc::clone(&cancel_token);
-                let light = light.clone();
+                let light = lights.clone();
 
                 std::thread::spawn(move || loop {
                     if cancel_token.load(std::sync::atomic::Ordering::SeqCst) {
@@ -942,16 +952,32 @@ impl RaytracerState {
                                         },
                                     );
 
-                                    //
-                                    // gamma correct
-                                    let pixel_color = math::vec3::clamp(
-                                        math::vec3::sqrt(
-                                            pixel_color
-                                                * (1 as Real / params.samples_per_pixel as Real),
-                                        ),
-                                        Vec3::broadcast(COLOR_CLAMP_MIN),
-                                        Vec3::broadcast(COLOR_CLAMP_MAX),
-                                    );
+                                    let gamma_correct =
+                                        1 as Real / params.samples_per_pixel as Real;
+
+                                    let check_invalid_pixel =
+                                        |x: Real| x.is_nan() || x.is_subnormal() || x.is_infinite();
+
+                                    let pixel_color = Vec3 {
+                                        x: if check_invalid_pixel(pixel_color.x) {
+                                            0 as Real
+                                        } else {
+                                            (pixel_color.x * gamma_correct).sqrt()
+                                        }
+                                        .clamp(0f32, 1f32),
+                                        y: if check_invalid_pixel(pixel_color.y) {
+                                            0 as Real
+                                        } else {
+                                            (pixel_color.y * gamma_correct).sqrt()
+                                        }
+                                        .clamp(0f32, 1f32),
+                                        z: if check_invalid_pixel(pixel_color.z) {
+                                            0 as Real
+                                        } else {
+                                            (pixel_color.z * gamma_correct).sqrt()
+                                        }
+                                        .clamp(0f32, 1f32),
+                                    };
 
                                     unsafe {
                                         output_pixels
@@ -1169,9 +1195,13 @@ impl MainWindow {
                 ui.text(format!("Aspect ratio: {}", p.aspect_ratio));
                 ui.text(format!("Aperture: {}", p.aperture));
                 ui.text(format!("Focus distance: {}", p.focus_dist));
+                ui.text(format!("Field of view: {}", p.vertical_fov));
                 ui.text(format!("Maximum ray depth: {}", p.max_ray_depth));
                 ui.text(format!("Samples per pixel: {}", p.samples_per_pixel));
-                ui.text(format!("Field of view: {}", p.vertical_fov));
+                ui.text(format!(
+                    "Workblock dimensions {0}x{0} pixels",
+                    p.worker_block_pixels
+                ));
 
                 ui.separator();
                 ui.text(format!("Worker threads: {}", p.workers));

@@ -27,40 +27,40 @@ impl Material for Dielectric {
         let sin_theta = (1 as Real - cos_theta * cos_theta).sqrt();
 
         if etai_over_etat * sin_theta > 1 as Real {
+            //
             // reflect
-            Some(ScatterRecord {
+            Some(ScatterRecord::SpecularRec {
                 ray: Ray::new(
                     hit_record.p,
                     reflect_unit_vector(uv, normalize(hit_record.normal)),
                     ray.time,
                 ),
-                albedo: Color::broadcast(1 as Real),
-                pdf: 0 as Real,
+                attenuation: Color::broadcast(1 as Real),
             })
         } else {
+            //
             // schlick approximation
             use crate::types::{random_real, schlick};
             let reflect_probability = schlick(cos_theta, etai_over_etat);
             if random_real() < reflect_probability {
-                Some(ScatterRecord {
+                Some(ScatterRecord::SpecularRec {
                     ray: Ray::new(
                         hit_record.p,
                         reflect_unit_vector(uv, hit_record.normal),
                         ray.time,
                     ),
-                    albedo: Color::broadcast(1 as Real),
-                    pdf: 0 as Real,
+                    attenuation: Color::broadcast(1 as Real),
                 })
             } else {
+                //
                 // refract
-                Some(ScatterRecord {
-                    albedo: Color::broadcast(1 as Real),
+                Some(ScatterRecord::SpecularRec {
+                    attenuation: Color::broadcast(1 as Real),
                     ray: Ray::new(
                         hit_record.p,
                         refract(uv, hit_record.normal, etai_over_etat),
                         ray.time,
                     ),
-                    pdf: 0 as Real,
                 })
             }
         }
