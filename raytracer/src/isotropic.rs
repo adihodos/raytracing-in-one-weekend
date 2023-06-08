@@ -4,7 +4,7 @@ use crate::{
     material::{Material, ScatterRecord},
     solid_color_texture::SolidColorTexture,
     texture::Texture,
-    types::{random_in_unit_sphere, Color, Ray},
+    types::{random_in_unit_sphere, Color, Ray, Real},
 };
 
 pub struct Isotropic {
@@ -30,7 +30,8 @@ impl Material for Isotropic {
     ) -> Option<crate::material::ScatterRecord> {
         Some(ScatterRecord {
             ray: Ray::new(hit_record.p, random_in_unit_sphere(), hit_record.t),
-            attenuation: self.albedo.value(hit_record.u, hit_record.v, hit_record.p),
+            albedo: self.albedo.value(hit_record.u, hit_record.v, hit_record.p),
+            pdf: 0 as Real,
         })
     }
 }

@@ -75,7 +75,10 @@ fn ray_color(r: &Ray, background: Color, world: &HittableList, depth: i32) -> Co
         let emitted = rec.mtl.emitted(rec.u, rec.v, rec.p);
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
             return emitted
-                + scatter.attenuation * ray_color(&scatter.ray, background, world, depth - 1);
+                + scatter.albedo
+                    * rec.mtl.scattering_pdf(r, &rec, &scatter)
+                    * ray_color(&scatter.ray, background, world, depth - 1)
+                    / scatter.pdf;
         } else {
             return emitted;
         }
