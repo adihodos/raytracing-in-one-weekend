@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     hittable::Hittable,
     onb::Onb,
-    types::{Point, Real, Vec3},
+    types::{random_real, Point, Real, Vec3},
 };
 
 pub trait Pdf {
@@ -51,5 +51,29 @@ impl Pdf for HittablePdf {
 
     fn generate(&self) -> Vec3 {
         self.obj.random(self.origin)
+    }
+}
+
+pub struct MixturePdf {
+    pdfs: [Arc<dyn Pdf>; 2],
+}
+
+impl MixturePdf {
+    pub fn new(p0: Arc<dyn Pdf>, p1: Arc<dyn Pdf>) -> Self {
+        Self { pdfs: [p0, p1] }
+    }
+}
+
+impl Pdf for MixturePdf {
+    fn value(&self, direction: Vec3) -> Real {
+        0.5 as Real * self.pdfs[0].value(direction) + 0.5 as Real * self.pdfs[1].value(direction)
+    }
+
+    fn generate(&self) -> Vec3 {
+        if random_real() < 0.5 as Real {
+            self.pdfs[0].generate()
+        } else {
+            self.pdfs[1].generate()
+        }
     }
 }

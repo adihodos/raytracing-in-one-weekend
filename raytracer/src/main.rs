@@ -11,7 +11,7 @@ use diffuse_light::DiffuseLight;
 use image_texture::ImageTexture;
 use material::ScatterRecord;
 use noise_texture::NoiseTexture;
-use pdf::{CosinePdf, HittablePdf, Pdf};
+use pdf::{CosinePdf, HittablePdf, MixturePdf, Pdf};
 use rectangles::XYRect;
 use serde::{Deserialize, Serialize};
 
@@ -91,12 +91,16 @@ fn ray_color(
                 origin: rec.p,
             };
 
+            let cosine_pdf: CosinePdf = rec.normal.into();
+
+            let mixed_pdf = MixturePdf::new(Arc::new(light_pdf), Arc::new(cosine_pdf));
+
             // let p: CosinePdf = rec.normal.into();
 
-            let scattered_ray = Ray::new(rec.p, light_pdf.generate(), r.time);
+            let scattered_ray = Ray::new(rec.p, mixed_pdf.generate(), r.time);
             let scatter = ScatterRecord {
                 ray: scattered_ray,
-                pdf: light_pdf.value(scattered_ray.direction),
+                pdf: mixed_pdf.value(scattered_ray.direction),
                 ..scatter
             };
 
