@@ -11,7 +11,7 @@ use diffuse_light::DiffuseLight;
 use image_texture::ImageTexture;
 use material::ScatterRecord;
 use noise_texture::NoiseTexture;
-use pdf::{CosinePdf, HittablePdf, MixturePdf, Pdf};
+use pdf::{HittablePdf, MixturePdf, Pdf};
 use rectangles::XYRect;
 use serde::{Deserialize, Serialize};
 
@@ -113,6 +113,17 @@ fn ray_color(
     } else {
         return background;
     }
+}
+
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
+enum Scene {
+    RandomWorld,
+    TwoSpheres,
+    TexturedSpheres,
+    PerlinSpheres,
+    SimpleLight,
+    CornellBox,
+    Chapter2Final,
 }
 
 fn scene_random_world() -> HittableList {
@@ -221,14 +232,6 @@ fn scene_two_spheres() -> HittableList {
 }
 
 fn scene_two_perlin_spheres() -> HittableList {
-    // let image_texture = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
-    //     "data/textures/uv_grids/ash_uvgrid10.jpg",
-    // ))));
-
-    // let image_texture1 = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
-    //     "data/textures/uv_grids/ash_uvgrid01.jpg",
-    // ))));
-
     let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new(3f32))));
 
     let mut world = HittableList::new();
@@ -249,7 +252,6 @@ fn scene_two_perlin_spheres() -> HittableList {
 
 fn scene_textured_spheres() -> HittableList {
     let image_texture = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
-        // "data/textures/uv_grids/ash_uvgrid01.jpg",
         "data/textures/misc/earthmap.jpg",
     ))));
 
@@ -620,7 +622,7 @@ fn scene_cornell_box_smoke() -> HittableList {
     world
 }
 
-fn final_scene() -> HittableList {
+fn scene_final_chapter2() -> HittableList {
     let mut rng = rand::thread_rng();
     let mut world = HittableList::new();
 
@@ -652,15 +654,17 @@ fn final_scene() -> HittableList {
 
     world.add(BvhNode::new(boxlist.as_mut_slice(), 0_f32, 1_f32));
 
-    let light = Arc::new(DiffuseLight::from((7f32, 7f32, 7f32)));
+    let light = Arc::new(DiffuseLight::from((17f32, 17f32, 17f32)));
 
-    world.add(Arc::new(XZRect {
-        x0: 123_f32,
-        x1: 423_f32,
-        z0: 147_f32,
-        z1: 412_f32,
-        k: 554_f32,
-        mtl: light.clone(),
+    world.add(Arc::new(FlipFace {
+        obj: Arc::new(XZRect {
+            x0: 123_f32,
+            x1: 423_f32,
+            z0: 147_f32,
+            z1: 412_f32,
+            k: 554_f32,
+            mtl: light.clone(),
+        }),
     }));
 
     let center = Vec3::new(400_f32, 400_f32, 200_f32);
@@ -749,21 +753,6 @@ fn final_scene() -> HittableList {
 
     world.add(node);
 
-    // let cam_params = {
-    //     let mut cp = CameraParameters::default();
-    //     cp.lookfrom = Vec3::new(478_f32, 278f32, -600_f32);
-    //     cp.lookat = Vec3::new(278_f32, 278_f32, 0_f32);
-    //     cp.world_up = Vec3::new(0_f32, 1_f32, 0_f32);
-    //     cp.focus_dist = 10_f32;
-    //     cp.aperture = 0_f32;
-    //     cp.field_of_view = 40_f32;
-    //     cp.time0 = 0_f32;
-    //     cp.time1 = 1_f32;
-
-    //     cp
-    // };
-
-    // (Arc::new(world), cam_params)
     world
 }
 
@@ -802,6 +791,13 @@ struct ImageOutput {
 unsafe impl std::marker::Send for ImageOutput {}
 unsafe impl std::marker::Sync for ImageOutput {}
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct RaytracerConfig {
+    active_scene: Scene,
+    default_params: RaytracerParams,
+    defined_scenes: Vec<(Scene, Option<RaytracerParams>)>,
+}
+
 struct RaytracerState {
     params: RaytracerParams,
     workers: Vec<std::thread::JoinHandle<()>>,
@@ -824,7 +820,7 @@ impl std::ops::Drop for RaytracerState {
 }
 
 impl RaytracerState {
-    fn load_parameters() -> RaytracerParams {
+    fn load_config() -> RaytracerConfig {
         let f = std::fs::File::open("data/config/raytracer.config.ron")
             .expect("Failed to open config file");
 
@@ -832,7 +828,19 @@ impl RaytracerState {
     }
 
     fn new() -> RaytracerState {
-        let params = Self::load_parameters();
+        let tracer_cfg = Self::load_config();
+
+        let (scene_type, params) = tracer_cfg
+            .defined_scenes
+            .iter()
+            .find(|(scene_type, _)| *scene_type == tracer_cfg.active_scene)
+            .map(|(scene_type, scene_params)| {
+                (
+                    scene_type,
+                    scene_params.unwrap_or(tracer_cfg.default_params),
+                )
+            })
+            .expect("Specified scene not found ...");
 
         let blocks_x = (params.image_width / params.worker_block_pixels) + 1;
         let blocks_y = (params.image_height / params.worker_block_pixels) + 1;
@@ -870,7 +878,14 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(scene_cornell_box());
+        let world = match scene_type {
+            Scene::RandomWorld => Arc::new(scene_random_world()),
+            Scene::CornellBox => Arc::new(scene_cornell_box()),
+            Scene::Chapter2Final => Arc::new(scene_final_chapter2()),
+            Scene::SimpleLight => Arc::new(scene_simple_light()),
+            _ => todo!("Unimplemented"),
+        };
+
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =
@@ -889,11 +904,11 @@ impl RaytracerState {
             k: 554f32,
             mtl: light_mtl.clone(),
         }));
-        lights.add(Arc::new(Sphere::new(
-            (190f32, 90f32, 190f32).into(),
-            90f32,
-            light_mtl.clone(),
-        )));
+        // lights.add(Arc::new(Sphere::new(
+        //     (190f32, 90f32, 190f32).into(),
+        //     90f32,
+        //     light_mtl.clone(),
+        // )));
 
         let lights = Arc::new(lights);
 
@@ -1176,7 +1191,7 @@ impl MainWindow {
         let elapsed = self.raytracer.raytracing_time;
         let mut queue_screenshot = self.queue_screenshot;
 
-        ui.window("Raytracer status")
+        ui.window("Status")
             .size([400f32, 600f32], imgui::Condition::FirstUseEver)
             .build(|| {
                 let btn_color =
@@ -1191,21 +1206,33 @@ impl MainWindow {
                 btn_color_active.pop();
 
                 ui.separator();
+                ui.text("---------- Image setup ----------");
                 ui.text(format!("Image size: {}x{}", p.image_width, p.image_height));
                 ui.text(format!("Aspect ratio: {}", p.aspect_ratio));
+
+                ui.separator();
+                ui.text("--------- Camera -----------");
+                ui.text(format!("position: {}", Vec3::from(p.look_from)));
+                ui.text(format!("look at: {}", Vec3::from(p.look_at)));
+                ui.text(format!("world up: {}", Vec3::from(p.world_up)));
                 ui.text(format!("Aperture: {}", p.aperture));
                 ui.text(format!("Focus distance: {}", p.focus_dist));
                 ui.text(format!("Field of view: {}", p.vertical_fov));
+
+                ui.separator();
+                ui.text("--------- Raytracer setup ---------");
                 ui.text(format!("Maximum ray depth: {}", p.max_ray_depth));
                 ui.text(format!("Samples per pixel: {}", p.samples_per_pixel));
+                ui.text(format!("Worker threads: {}", p.workers));
                 ui.text(format!(
                     "Workblock dimensions {0}x{0} pixels",
                     p.worker_block_pixels
                 ));
 
-                ui.separator();
-                ui.text(format!("Worker threads: {}", p.workers));
                 ui.text(format!("Randomized workloads: {}", p.shuffle_workblocks));
+
+                ui.separator();
+                ui.text("--------- Execution status ---------");
                 imgui::ProgressBar::new(work_done as f32 / total_work as f32)
                     .overlay_text(format!(
                         "Pixel blocks raytraced {}/{}",
@@ -1276,37 +1303,8 @@ struct RaytracingGlState {
 }
 
 impl RaytracingGlState {
-    const VS_PROGRAM: &'static str = r#"
-#version 460 core
-
-layout(location = 1) out vec2 texCoord;
-
-out gl_PerVertex {
-    layout(location = 0) vec4 gl_Position;
-};
-
-void main()
-{
-    vec2 position = vec2(gl_VertexID % 2, gl_VertexID / 2) * 4.0 - 1;
-    texCoord = (position + 1) * 0.5;
-    texCoord.y = 1.0 - texCoord.y;
-
-    gl_Position = vec4(position, 0, 1);
-}
-"#;
-
-    const FS_PROGRAM: &'static str = r#"
-#version 460 core
-
-layout(location = 1) in vec2 texCoord;
-layout(binding = 0) uniform sampler2D texImg;
-layout(location = 0) out vec4 FinalFragColor;
-
-void main()
-{
-    FinalFragColor = texture(texImg, texCoord);
-}
-"#;
+    const VS_PROGRAM: &'static str = include_str!("../../data/shaders/quad.vert");
+    const FS_PROGRAM: &'static str = include_str!("../../data/shaders/quad.frag");
 
     fn new(img_width: u32, img_height: u32) -> RaytracingGlState {
         let vao = rendering::UniqueVertexArray::new(unsafe {

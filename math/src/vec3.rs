@@ -68,28 +68,6 @@ where
     pub fn as_mut_ptr(&mut self) -> *mut T {
         &mut self.x as *mut _
     }
-
-    // pub fn length_squared(&self) -> T {
-    //     self.x * self.x + self.y * self.y + self.z * self.z
-    // }
-
-    // pub fn length(&self) -> T
-    // where
-    //     T: Float + Copy + Clone + std::fmt::Debug,
-    // {
-    //     self.length_squared().sqrt()
-    // }
-
-    // pub fn sqrt(&self) -> Self
-    // where
-    //     T: Float + Copy + Clone + std::fmt::Debug,
-    // {
-    //     Self {
-    //         x: self.x.sqrt(),
-    //         y: self.y.sqrt(),
-    //         z: self.z.sqrt(),
-    //     }
-    // }
 }
 
 pub mod consts {
@@ -771,5 +749,14 @@ where
         x: if a.x { x.x } else { y.x },
         y: if a.y { x.y } else { y.y },
         z: if a.z { x.z } else { y.z },
+    }
+}
+
+impl<T> std::fmt::Display for TVec3<T>
+where
+    T: Copy + Clone + Num + std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}, {}]", self.x, self.y, self.z)
     }
 }
