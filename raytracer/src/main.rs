@@ -124,7 +124,10 @@ fn ray_color(r: &Ray, background: Color, world: &HittableList, depth: i32) -> Co
         let emitted = rec.mtl.emitted(rec.u, rec.v, rec.p);
         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
             return emitted
-                + scatter.attenuation * ray_color(&scatter.ray, background, world, depth - 1);
+                + scatter.albedo
+                    * rec.mtl.scattering_pdf(r, &rec, &scatter)
+                    * ray_color(&scatter.ray, background, world, depth - 1)
+                    / scatter.pdf;
         } else {
             return emitted;
         }
@@ -880,7 +883,7 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = Arc::new(final_scene());
+        let world = Arc::new(scene_cornell_box());
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
         let mut image_pixels =
