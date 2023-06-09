@@ -1,12 +1,12 @@
 (
-    active_scene: RandomWorld,
+    active_scene: CornellBox,
     default_params:(
         workers: 8,
         worker_block_pixels: 8,
         aspect_ratio: 1.0,
         image_width: 800,
         image_height: 800,
-        samples_per_pixel: 512,
+        samples_per_pixel: 2048,
         max_ray_depth: 50,
         vertical_fov: 40.0,
         look_from: (278.0, 278.0, -800.0),

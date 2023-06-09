@@ -1044,8 +1044,8 @@ impl RaytracerState {
                                     let gamma_correct =
                                         1 as Real / params.samples_per_pixel as Real;
 
-                                    let check_invalid_pixel =
-                                        |x: Real| x.is_nan() || x.is_subnormal() || x.is_infinite();
+                                    let check_invalid_pixel = |x: Real| !x.is_normal();
+                                    //x.is_nan() || x.is_infinite();
 
                                     let pixel_color = Vec3 {
                                         x: if check_invalid_pixel(pixel_color.x) {
@@ -1053,19 +1053,19 @@ impl RaytracerState {
                                         } else {
                                             (pixel_color.x * gamma_correct).sqrt()
                                         }
-                                        .clamp(0f32, 1f32),
+                                        .clamp(0f32, 0.9999f32),
                                         y: if check_invalid_pixel(pixel_color.y) {
                                             0 as Real
                                         } else {
                                             (pixel_color.y * gamma_correct).sqrt()
                                         }
-                                        .clamp(0f32, 1f32),
+                                        .clamp(0f32, 0.9999f32),
                                         z: if check_invalid_pixel(pixel_color.z) {
                                             0 as Real
                                         } else {
                                             (pixel_color.z * gamma_correct).sqrt()
                                         }
-                                        .clamp(0f32, 1f32),
+                                        .clamp(0f32, 0.9999f32),
                                     };
 
                                     unsafe {
