@@ -200,4 +200,28 @@ impl Hittable for MovingSphere {
 
         Some(crate::aabb3::merge_aabbs(&box_t0, &box_t1))
     }
+
+    fn pdf_value(&self, o: Point, v: crate::types::Vec3) -> Real {
+        self.hit(
+            &Ray::new(o, v, 0 as Real),
+            0.001 as Real,
+            std::f32::MAX as Real,
+        )
+        .map_or(0 as Real, |_| {
+            let cos_theta_max = (1 as Real
+                - self.radius * self.radius / length_squared(self.center(0 as Real) - o))
+            .sqrt();
+            let solid_angle =
+                2 as Real * std::f32::consts::PI as Real * (1 as Real - cos_theta_max);
+
+            return 1 as Real / solid_angle;
+        })
+    }
+
+    fn random(&self, v: crate::types::Vec3) -> crate::types::Vec3 {
+        let direction = self.center(self.time1) - self.center(self.time0) - v;
+        let distance_squared = length_squared(direction);
+        let uvw: Onb = direction.into();
+        uvw.local_from_vec(random_to_sphere(self.radius, distance_squared))
+    }
 }

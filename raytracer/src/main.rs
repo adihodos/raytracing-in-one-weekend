@@ -126,7 +126,7 @@ enum Scene {
     Chapter2Final,
 }
 
-fn scene_random_world() -> HittableList {
+fn scene_random_world() -> (HittableList, HittableList) {
     let ground_material = Arc::new(Lambertian::from_texture(Arc::new(
         CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32)),
     )));
@@ -207,10 +207,21 @@ fn scene_random_world() -> HittableList {
         )),
     )));
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    (world, lights)
 }
 
-fn scene_two_spheres() -> HittableList {
+fn scene_two_spheres() -> (HittableList, HittableList) {
     let checker_mtl = Arc::new(Lambertian::from_texture(Arc::new(
         CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32)),
     )));
@@ -228,10 +239,21 @@ fn scene_two_spheres() -> HittableList {
         checker_mtl.clone(),
     )));
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    (world, lights)
 }
 
-fn scene_two_perlin_spheres() -> HittableList {
+fn scene_two_perlin_spheres() -> (HittableList, HittableList) {
     let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new(3f32))));
 
     let mut world = HittableList::new();
@@ -247,10 +269,21 @@ fn scene_two_perlin_spheres() -> HittableList {
         noise_mtl.clone(),
     )));
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    (world, lights)
 }
 
-fn scene_textured_spheres() -> HittableList {
+fn scene_textured_spheres() -> (HittableList, HittableList) {
     let image_texture = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
         "data/textures/misc/earthmap.jpg",
     ))));
@@ -263,10 +296,21 @@ fn scene_textured_spheres() -> HittableList {
         image_texture.clone(),
     )));
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    (world, lights)
 }
 
-fn scene_simple_light() -> HittableList {
+fn scene_simple_light() -> (HittableList, HittableList) {
     let noise_mtl = Arc::new(Lambertian::from_texture(Arc::new(NoiseTexture::new(3f32))));
 
     let mut world = HittableList::new();
@@ -299,10 +343,21 @@ fn scene_simple_light() -> HittableList {
         red_light,
     )));
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    (world, lights)
 }
 
-fn scene_cornell_box() -> HittableList {
+fn scene_cornell_box() -> (HittableList, HittableList) {
     let colors = [
         (0.65f32, 0.05f32, 0.05f32),
         (0.73f32, 0.73f32, 0.73f32),
@@ -458,7 +513,24 @@ fn scene_cornell_box() -> HittableList {
     let glass_sphere = Arc::new(Sphere::new((190f32, 90f32, 190f32).into(), 90f32, glass));
     world.add(glass_sphere);
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    lights.add(Arc::new(Sphere::new(
+        (190f32, 90f32, 190f32).into(),
+        90f32,
+        light_mtl.clone(),
+    )));
+
+    (world, lights)
 }
 
 fn scene_cornell_box_smoke() -> HittableList {
@@ -622,7 +694,7 @@ fn scene_cornell_box_smoke() -> HittableList {
     world
 }
 
-fn scene_final_chapter2() -> HittableList {
+fn scene_final_chapter2() -> (HittableList, HittableList) {
     let mut rng = rand::thread_rng();
     let mut world = HittableList::new();
 
@@ -753,7 +825,24 @@ fn scene_final_chapter2() -> HittableList {
 
     world.add(node);
 
-    world
+    let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: 213f32,
+        x1: 343f32,
+        z0: 227f32,
+        z1: 332f32,
+        k: 554f32,
+        mtl: light_mtl.clone(),
+    }));
+
+    // lights.add(Arc::new(Sphere::new(
+    //     (190f32, 90f32, 190f32).into(),
+    //     90f32,
+    //     light_mtl.clone(),
+    // )));
+
+    (world, lights)
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -878,11 +967,11 @@ impl RaytracerState {
         );
 
         let total_workblocks = workblocks.len() as u32;
-        let world = match scene_type {
-            Scene::RandomWorld => Arc::new(scene_random_world()),
-            Scene::CornellBox => Arc::new(scene_cornell_box()),
-            Scene::Chapter2Final => Arc::new(scene_final_chapter2()),
-            Scene::SimpleLight => Arc::new(scene_simple_light()),
+        let (world, lights) = match scene_type {
+            Scene::RandomWorld => scene_random_world(),
+            Scene::CornellBox => scene_cornell_box(),
+            Scene::Chapter2Final => scene_final_chapter2(),
+            Scene::SimpleLight => scene_simple_light(),
             _ => todo!("Unimplemented"),
         };
 
@@ -894,22 +983,7 @@ impl RaytracerState {
         let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
         let cancel_token = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-        let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
-        let mut lights = HittableList::new();
-        lights.add(Arc::new(XZRect {
-            x0: 213f32,
-            x1: 343f32,
-            z0: 227f32,
-            z1: 332f32,
-            k: 554f32,
-            mtl: light_mtl.clone(),
-        }));
-        // lights.add(Arc::new(Sphere::new(
-        //     (190f32, 90f32, 190f32).into(),
-        //     90f32,
-        //     light_mtl.clone(),
-        // )));
-
+        let world = Arc::new(world);
         let lights = Arc::new(lights);
 
         let workers = (0..params.workers)
@@ -1125,6 +1199,32 @@ impl MainWindow {
             self.update_loop();
 
             if self.queue_screenshot {
+                //
+                // capture raytraced image
+                let cont = unsafe {
+                    std::slice::from_raw_parts(
+                        self.raytracer.image_pixels.as_ptr() as *const _ as *const f32,
+                        self.raytracer.image_pixels.len() * 3,
+                    )
+                };
+
+                image::DynamicImage::ImageRgb32F(
+                    image::ImageBuffer::from_raw(
+                        (self.raytracer.params.image_width) as u32,
+                        (self.raytracer.params.image_height) as u32,
+                        cont.into(),
+                    )
+                    .expect("Failed to create image buffer"),
+                )
+                .to_rgb8()
+                .save(format!(
+                    "screenshots/raytraced_{}.png",
+                    chrono::Local::now().format("%Y_%m_%d_%H_%M_%S")
+                ))
+                .expect("Failed to save image");
+
+                //
+                // capture framebuffer
                 let (img_width, img_height) = self.window.get_framebuffer_size();
                 let mut pixels = vec![0u8; (img_width * img_height * 3) as usize];
 
@@ -1148,7 +1248,7 @@ impl MainWindow {
                 )
                 .flipv()
                 .save(format!(
-                    "screenshots/raytraced_{}.png",
+                    "screenshots/framebuffer_{}.png",
                     chrono::Local::now().format("%Y_%m_%d_%H_%M_%S")
                 ))
                 .expect("Failed to save screenshot");

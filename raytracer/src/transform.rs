@@ -44,6 +44,14 @@ impl Hittable for Translate {
             )
         })
     }
+
+    fn pdf_value(&self, o: Point, v: Vec3) -> Real {
+        self.obj.pdf_value(o, v)
+    }
+
+    fn random(&self, v: Vec3) -> Vec3 {
+        self.obj.random(v)
+    }
 }
 
 pub struct RotateY {
@@ -133,5 +141,13 @@ impl Hittable for RotateY {
                 ..hitrec
             }
         })
+    }
+
+    fn pdf_value(&self, o: Point, v: Vec3) -> Real {
+        self.obj.pdf_value(o, v)
+    }
+
+    fn random(&self, v: Vec3) -> Vec3 {
+        self.obj.random(v)
     }
 }
