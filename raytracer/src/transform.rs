@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     aabb3::Aabb,
     hittable::{HitRecord, Hittable},
-    types::{degrees_to_radians, Point, Ray, Real, Vec3},
+    types::{degrees_to_radians, Mat4, Point, Ray, Real, Vec3, Vec4},
 };
 
 pub struct Translate {
@@ -139,6 +139,66 @@ impl Hittable for RotateY {
                 p,
                 normal: n,
                 ..hitrec
+            }
+        })
+    }
+
+    fn pdf_value(&self, o: Point, v: Vec3) -> Real {
+        self.obj.pdf_value(o, v)
+    }
+
+    fn random(&self, v: Vec3) -> Vec3 {
+        self.obj.random(v)
+    }
+}
+
+pub struct Transform {
+    obj2world: Mat4,
+    world2object: Mat4,
+    normal2world: Mat4,
+    obj: Arc<dyn Hittable>,
+}
+
+impl Transform {
+    pub fn new(obj2world: Mat4, obj: Arc<dyn Hittable>) -> Transform {
+        use math::mat4;
+
+        let world2object = mat4::invert(&obj2world);
+
+        Transform {
+            obj2world,
+            world2object,
+            normal2world: world2object.transpose(),
+            obj,
+        }
+    }
+}
+
+impl Hittable for Transform {
+    fn bounding_box(&self, time0: Real, time1: Real) -> Option<Aabb> {
+        self.obj
+            .bounding_box(time0, time1)
+            .map(|bbox| crate::aabb3::transform(&self.obj2world, &bbox))
+    }
+
+    fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<HitRecord> {
+        use math::ray::transform;
+        use math::vec3::normalize;
+
+        //
+        // transform ray to object local space and perform hit testing there
+        let transformed_ray = transform(&self.world2object, r);
+
+        self.obj.hit(&transformed_ray, t_min, t_max).map(|hit| {
+            //
+            // transform hit data to world space
+            let p_world = (self.obj2world * Vec4::from_vec3(&hit.p, 1 as Real)).xyz();
+            let n_world = (self.normal2world * Vec4::from_vec3(&hit.normal, 0 as Real)).xyz();
+
+            HitRecord {
+                p: p_world,
+                normal: normalize(n_world),
+                ..hit
             }
         })
     }

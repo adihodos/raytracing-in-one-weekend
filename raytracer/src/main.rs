@@ -3,13 +3,14 @@
 use std::{
     iter::FromIterator,
     os::raw::c_void,
+    path::Path,
     sync::{mpsc::Receiver, Arc},
 };
 
 use checker_texture::CheckerTexture;
 use diffuse_light::DiffuseLight;
 use image_texture::ImageTexture;
-use material::ScatterRecord;
+use material::{Material, ScatterRecord};
 use noise_texture::NoiseTexture;
 use pdf::{HittablePdf, MixturePdf, Pdf};
 use rectangles::XYRect;
@@ -27,6 +28,7 @@ mod dielectric;
 mod diffuse_light;
 mod flip_face;
 mod generic_handle;
+mod geometry_import;
 mod hittable;
 mod hittable_list;
 mod image_texture;
@@ -68,6 +70,13 @@ use crate::{
     rectangles::{XZRect, YZRect},
     transform::{RotateY, Translate},
 };
+
+#[derive(Copy, Clone)]
+struct RaytracedPixel {
+    x: u32,
+    y: u32,
+    color: Color,
+}
 
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
@@ -124,6 +133,7 @@ enum Scene {
     SimpleLight,
     CornellBox,
     Chapter2Final,
+    MeshTest,
 }
 
 fn scene_random_world() -> (HittableList, HittableList) {
@@ -258,16 +268,41 @@ fn scene_two_perlin_spheres() -> (HittableList, HittableList) {
 
     let mut world = HittableList::new();
 
+    let grid_tex = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid01.jpg",
+    ))));
+
     world.add(Arc::new(Sphere::new(
         Point::new(0f32, -1000f32, 0f32),
         1000f32,
-        noise_mtl.clone(),
+        grid_tex,
     )));
+
+    let grid_tex = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid03.jpg",
+    ))));
     world.add(Arc::new(Sphere::new(
-        Point::new(0f32, 2f32, 0f32),
-        2f32,
+        Point::new(4f32, 4f32, 0f32),
+        3f32,
+        grid_tex,
+    )));
+
+    world.add(Arc::new(Sphere::new(
+        Point::new(-6f32, 6f32, 2f32),
+        6f32,
         noise_mtl.clone(),
     )));
+
+    world.add(Arc::new(FlipFace {
+        obj: Arc::new(XZRect {
+            x0: -1000f32,
+            x1: 1000f32,
+            z0: -1000f32,
+            z1: 1000f32,
+            k: 1000f32,
+            mtl: Arc::<DiffuseLight>::new((1f32, 1f32, 1f32).into()),
+        }),
+    }));
 
     let light_mtl: Arc<DiffuseLight> = Arc::new((0f32, 0f32, 0f32).into());
     let mut lights = HittableList::new();
@@ -845,6 +880,250 @@ fn scene_final_chapter2() -> (HittableList, HittableList) {
     (world, lights)
 }
 
+struct Mesh {
+    geometry: geometry_import::ImportedGeometry,
+    mtl: Arc<dyn Material>,
+}
+
+impl Mesh {
+    fn from_file<P: AsRef<Path>>(p: P) -> Mesh {
+        let geometry = geometry_import::ImportedGeometry::import_from_file(&p)
+            .expect("Failed to import teapot model");
+        eprintln!(
+            "Model: vertices {}, indices {}, nodes {}, bounding box {:?}",
+            geometry.vertices().len(),
+            geometry.indices().len(),
+            geometry.nodes().len(),
+            geometry.aabb
+        );
+
+        Mesh {
+            geometry,
+            mtl: Arc::new(Lambertian::new((0f32, 1f32, 1f32))),
+        }
+    }
+
+    fn triangle_ray_intersect(
+        v0: &geometry_import::GeometryVertex,
+        v1: &geometry_import::GeometryVertex,
+        v2: &geometry_import::GeometryVertex,
+        ray: &Ray,
+        t_min: Real,
+        t_max: Real,
+        mtl: Arc<dyn Material>,
+    ) -> Option<hittable::HitRecord> {
+        use math::vec3::{are_on_the_same_plane_side, cross, dot, normalize};
+
+        let c0 = v1.pos - v0.pos;
+        let c1 = v2.pos - v1.pos;
+        let n = normalize(cross(c0, c1));
+
+        //
+        // check if the ray hits the triangle plane (use v0 as origin)
+        let d = dot(n, v0.pos);
+
+        const EPSILON: Real = 1.0E-5 as Real;
+        let b_dot_n = dot(ray.direction, n);
+
+        if b_dot_n.abs() < EPSILON {
+            //
+            // ray is parallel or contained in the triangle's plane
+            return None;
+        }
+
+        //
+        // compute point of intersection on the triangle's plane
+        let a_dot_n = dot(ray.origin, n);
+        let t = (d - a_dot_n) / b_dot_n;
+
+        if !(t < t_max && t > t_min) {
+            //
+            // intersection point is behind the ray
+            return None;
+        }
+
+        let p = ray.at(t);
+
+        let vertices = [v0.pos, v1.pos, v2.pos];
+
+        //
+        // check if the point lies inside the triangle
+        let containment_tests_failed = [(0, 1), (1, 2), (2, 0)].iter().any(|vertex_indices| {
+            // direction vector along the edge
+            let edge_vec = vertices[vertex_indices.1] - vertices[vertex_indices.0];
+            // direction vector from the vertex to the intersection point with the ray
+            let intersect_point_vec = p - vertices[vertex_indices.0];
+            // orthogonal vector to the above two vectors
+            let orthogonal_vec = cross(edge_vec, intersect_point_vec);
+
+            !are_on_the_same_plane_side(orthogonal_vec, n)
+        });
+
+        if containment_tests_failed {
+            //
+            // point is on the plane defined by the triangle's vertices but
+            // outside the triangle
+            return None;
+        }
+
+        //
+        // Point lies inside the triangle
+        Some(hittable::HitRecord::new(
+            p, n, ray, t, mtl, v0.uv.x, v0.uv.y,
+        ))
+    }
+}
+
+impl Hittable for Mesh {
+    fn bounding_box(&self, time0: Real, time1: Real) -> Option<aabb3::Aabb> {
+        Some(self.geometry.aabb)
+    }
+
+    fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<hittable::HitRecord> {
+        if self.geometry.aabb.hit(r, t_min, t_max) {
+            for node in self.geometry.nodes().iter() {
+                if !node.aabb.hit(r, t_min, t_max) {
+                    continue;
+                }
+
+                let start = node.index_range.start;
+                let end = node.index_range.end;
+
+                assert!((end - start) % 3 == 0);
+
+                let mut i = 0usize;
+
+                while i < end / 3 {
+                    let v0 = self.geometry.vertices()[self.geometry.indices()[i + 0] as usize];
+                    let v1 = self.geometry.vertices()[self.geometry.indices()[i + 1] as usize];
+                    let v2 = self.geometry.vertices()[self.geometry.indices()[i + 2] as usize];
+
+                    let intersect_result = Self::triangle_ray_intersect(
+                        &v0,
+                        &v1,
+                        &v2,
+                        r,
+                        t_min,
+                        t_max,
+                        self.mtl.clone(),
+                    );
+
+                    if intersect_result.is_some() {
+                        return intersect_result;
+                    }
+
+                    i += 3;
+                }
+            }
+        }
+
+        None
+    }
+}
+
+fn scene_mesh() -> (HittableList, HittableList) {
+    // let geometry =
+    //     geometry_import::ImportedGeometry::import_from_file(&"data/models/teapot/pyramid.glb")
+    //         .expect("Failed to import teapot model");
+    // eprintln!(
+    //     "Model: vertices {}, indices {}, nodes {}",
+    //     geometry.vertices().len(),
+    //     geometry.indices().len(),
+    //     geometry.nodes().len()
+    // );
+
+    // geometry
+    //     .nodes()
+    //     .iter()
+    //     .filter(|node| !node.index_range.is_empty())
+    //     .for_each(|node| {
+    //         eprintln!("Node {:?}, bbox {:?}", node.index_range, node.aabb);
+    //     });
+
+    let mut world = HittableList::new();
+
+    //
+    // add floor
+    let floor_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid01.jpg",
+    ))));
+
+    let floor = Arc::new(XZRect {
+        x0: -1000f32,
+        x1: 1000f32,
+        z0: -1000f32,
+        z1: 1000f32,
+        k: 0f32,
+        mtl: floor_mtl,
+    });
+
+    world.add(floor);
+
+    world.add(Arc::new(FlipFace {
+        obj: Arc::new(XZRect {
+            x0: -1000f32,
+            x1: 1000f32,
+            z0: -1000f32,
+            z1: 1000f32,
+            k: 1000f32,
+            mtl: Arc::new(DiffuseLight::from((1f32, 1f32, 1f32))),
+        }),
+    }));
+
+    // world.add(Arc::new(XZRect {
+    //     x0: 0f32,
+    //     x1: 4f32,
+    //     z0: 0f32,
+    //     z1: 4f32,
+    //     k: 4f32,
+    //     mtl: light_mtl.clone(),
+    // }));
+
+    // world.add(Arc::new(XYRect {
+    //     x0: 0f32,
+    //     x1: 4f32,
+    //     y0: 0f32,
+    //     y1: 4f32,
+    //     k: 2f32,
+    //     mtl: light_mtl.clone(),
+    // }));
+
+    // world.add(Arc::new(Mesh::from_file("data/models/teapot/pyramid.glb")));
+
+    let block_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid03.jpg",
+    ))));
+    let block = Arc::new(Block::unit_cube(block_mtl));
+    // world.add(block.clone());
+
+    use math::quat;
+    use math::vec3;
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(45 as Real, vec3::consts::unit_y()));
+    let t = Mat4::translate((35f32, 35f32, 0f32).into());
+    let s = Mat4::uniform_scale(35f32);
+    let transformed_block = Arc::new(crate::transform::Transform::new(t * r * s, block.clone()));
+    world.add(transformed_block);
+
+    let r = random_rotation_matrix();
+    let s = 24f32;
+    let t = Mat4::translate((-35f32, 35f32, -20f32).into());
+    let transformed_block = Arc::new(crate::transform::Transform::new(t * r * s, block.clone()));
+    world.add(transformed_block);
+
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: -1000f32,
+        x1: 1000f32,
+        z0: -1000f32,
+        z1: 1000f32,
+        k: 1000f32,
+        mtl: Arc::<DiffuseLight>::new((0f32, 0f32, 0f32).into()),
+    }));
+
+    (world, lights)
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 struct RaytracerParams {
     workers: i32,
@@ -870,16 +1149,6 @@ struct WorkBlock {
     ydim: (i32, i32),
 }
 
-#[derive(Copy, Clone, Debug)]
-struct ImageOutput {
-    pixels: *mut Color,
-    width: i32,
-    height: i32,
-}
-
-unsafe impl std::marker::Send for ImageOutput {}
-unsafe impl std::marker::Sync for ImageOutput {}
-
 #[derive(serde::Serialize, serde::Deserialize)]
 struct RaytracerConfig {
     active_scene: Scene,
@@ -896,6 +1165,7 @@ struct RaytracerState {
     cancel_token: Arc<std::sync::atomic::AtomicBool>,
     timestamp: std::time::Instant,
     raytracing_time: std::time::Duration,
+    rx: std::sync::mpsc::Receiver<RaytracedPixel>,
 }
 
 impl std::ops::Drop for RaytracerState {
@@ -972,13 +1242,14 @@ impl RaytracerState {
             Scene::CornellBox => scene_cornell_box(),
             Scene::Chapter2Final => scene_final_chapter2(),
             Scene::SimpleLight => scene_simple_light(),
+            Scene::MeshTest => scene_mesh(),
+            Scene::PerlinSpheres => scene_two_perlin_spheres(),
+            Scene::TwoSpheres => scene_two_spheres(),
             _ => todo!("Unimplemented"),
         };
 
         use std::sync::Mutex;
         let workblocks = Arc::new(Mutex::new(workblocks));
-        let mut image_pixels =
-            vec![Color::broadcast(0 as Real); (params.image_width * params.image_height) as usize];
 
         let workblocks_done = Arc::new(std::sync::atomic::AtomicI32::new(0));
         let cancel_token = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -986,18 +1257,17 @@ impl RaytracerState {
         let world = Arc::new(world);
         let lights = Arc::new(lights);
 
+        let (tx, rx) = std::sync::mpsc::channel::<RaytracedPixel>();
+
         let workers = (0..params.workers)
             .map(|worker_idx| {
                 let workblocks = Arc::clone(&workblocks);
                 let world = Arc::clone(&world);
-                let output_pixels = ImageOutput {
-                    pixels: image_pixels.as_mut_ptr(),
-                    width: params.image_width,
-                    height: params.image_height,
-                };
+
                 let workblocks_done = Arc::clone(&workblocks_done);
                 let cancel_token = Arc::clone(&cancel_token);
                 let light = lights.clone();
+                let tx = tx.clone();
 
                 std::thread::spawn(move || loop {
                     if cancel_token.load(std::sync::atomic::Ordering::SeqCst) {
@@ -1044,36 +1314,36 @@ impl RaytracerState {
                                     let gamma_correct =
                                         1 as Real / params.samples_per_pixel as Real;
 
+                                    let gamma_correct_fn = |x: Real| {
+                                        (x * gamma_correct).sqrt().clamp(0 as Real, 1 as Real)
+                                    };
+
                                     let check_invalid_pixel = |x: Real| !x.is_normal();
-                                    //x.is_nan() || x.is_infinite();
 
                                     let pixel_color = Vec3 {
                                         x: if check_invalid_pixel(pixel_color.x) {
                                             0 as Real
                                         } else {
-                                            (pixel_color.x * gamma_correct).sqrt()
-                                        }
-                                        .clamp(0f32, 0.9999f32),
+                                            gamma_correct_fn(pixel_color.x)
+                                        },
                                         y: if check_invalid_pixel(pixel_color.y) {
                                             0 as Real
                                         } else {
-                                            (pixel_color.y * gamma_correct).sqrt()
-                                        }
-                                        .clamp(0f32, 0.9999f32),
+                                            gamma_correct_fn(pixel_color.y)
+                                        },
                                         z: if check_invalid_pixel(pixel_color.z) {
                                             0 as Real
                                         } else {
-                                            (pixel_color.z * gamma_correct).sqrt()
-                                        }
-                                        .clamp(0f32, 0.9999f32),
+                                            gamma_correct_fn(pixel_color.z)
+                                        },
                                     };
 
-                                    unsafe {
-                                        output_pixels
-                                            .pixels
-                                            .add((y * params.image_width + x) as usize)
-                                            .write(pixel_color);
-                                    }
+                                    tx.send(RaytracedPixel {
+                                        x: x as u32,
+                                        y: y as u32,
+                                        color: pixel_color,
+                                    })
+                                    .expect("Failed to send pixel to main");
                                 });
                             });
 
@@ -1089,15 +1359,21 @@ impl RaytracerState {
             })
             .collect::<Vec<_>>();
 
+        drop(tx);
+
         RaytracerState {
             total_workblocks,
             params,
             workers,
             workblocks_done,
-            image_pixels,
+            image_pixels: vec![
+                Color::broadcast(0 as Real);
+                (params.image_width * params.image_height) as usize
+            ],
             cancel_token,
             timestamp: std::time::Instant::now(),
             raytracing_time: std::time::Duration::from_millis(0),
+            rx,
         }
     }
 
@@ -1131,6 +1407,13 @@ impl RaytracerState {
     fn cancel_work(&mut self) {
         self.cancel_token
             .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn recv_pixels(&mut self) {
+        while let Ok(pixel) = self.rx.try_recv() {
+            self.image_pixels[(pixel.y * self.params.image_width as u32 + pixel.x) as usize] =
+                pixel.color;
+        }
     }
 }
 
@@ -1350,6 +1633,8 @@ impl MainWindow {
     }
 
     fn update_loop(&mut self) {
+        self.raytracer.recv_pixels();
+
         let (width, height) = self.window.get_framebuffer_size();
 
         unsafe {

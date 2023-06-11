@@ -33,7 +33,7 @@ impl ImageTexture {
             width: img.width(),
             height: img.height(),
             bytes_per_scanline: img.width() * 3,
-            pixels: img.into_vec(),
+            pixels: img.to_vec(),
         }
     }
 }

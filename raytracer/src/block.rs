@@ -15,6 +15,10 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn unit_cube(mtl: Arc<dyn Material>) -> Self {
+        Self::new((-0.5f32, -0.5f32, -0.5f32), (0.5f32, 0.5f32, 0.5f32), mtl)
+    }
+
     pub fn new<P: Into<Point>>(p0: P, p1: P, mtl: Arc<dyn Material>) -> Self {
         let mut sides = HittableList::new();
         let p0: Point = p0.into();

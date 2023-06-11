@@ -1,4 +1,6 @@
-use crate::types::{Ray, Real, Vec3};
+use math::vec3::TVec3;
+
+use crate::types::{Mat4, Ray, Real, Vec3};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Aabb {
@@ -41,6 +43,11 @@ impl Aabb {
 
         true
     }
+
+    pub fn add_point(&mut self, p: TVec3<Real>) {
+        self.min = math::vec3::min(self.min, p);
+        self.max = math::vec3::max_sv(self.max, p);
+    }
 }
 pub fn merge_aabbs(a: &Aabb, b: &Aabb) -> Aabb {
     let min = Vec3::new(
@@ -64,5 +71,23 @@ impl Default for Aabb {
             Vec3::broadcast(std::f32::MAX),
             Vec3::broadcast(std::f32::MIN),
         )
+    }
+}
+
+pub fn transform(mat: &Mat4, aabb: &Aabb) -> Aabb {
+    let xmin = mat[0] * aabb.min.x;
+    let xmax = mat[0] * aabb.max.x;
+
+    let ymin = mat[1] * aabb.min.y;
+    let ymax = mat[1] * aabb.max.y;
+
+    let zmin = mat[2] * aabb.min.z;
+    let zmax = mat[2] * aabb.max.z;
+
+    use math::vec4::{max, min};
+
+    Aabb {
+        min: (min(xmin, xmax) + min(ymin, ymax) + min(zmin, zmax) + mat.column(3)).xyz(),
+        max: (max(xmin, xmax) + max(ymin, ymax) + max(zmin, zmax) + mat.column(3)).xyz(),
     }
 }

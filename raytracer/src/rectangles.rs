@@ -79,7 +79,6 @@ impl Hittable for XYRect {
 
 //
 //
-
 pub struct XZRect {
     pub x0: Real,
     pub x1: Real,

@@ -46,6 +46,14 @@ where
     {
         self.square_len().sqrt()
     }
+
+    pub fn xyz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+        }
+    }
 }
 
 pub mod consts {
@@ -245,6 +253,30 @@ where
         let mut res = self;
         res *= rhs;
         res
+    }
+}
+
+pub fn max<T>(a: TVec4<T>, b: TVec4<T>) -> TVec4<T>
+where
+    T: Num + Copy + crate::minmax::MinMax<Output = T>,
+{
+    TVec4 {
+        x: T::max(a.x, b.x),
+        y: T::max(a.y, b.y),
+        z: T::max(a.z, b.z),
+        w: T::max(a.w, b.w),
+    }
+}
+
+pub fn min<T>(a: TVec4<T>, b: TVec4<T>) -> TVec4<T>
+where
+    T: Num + Copy + crate::minmax::MinMax<Output = T>,
+{
+    TVec4 {
+        x: T::min(a.x, b.x),
+        y: T::min(a.y, b.y),
+        z: T::min(a.z, b.z),
+        w: T::min(a.w, b.w),
     }
 }
 

@@ -5,6 +5,7 @@ pub mod rectangle;
 pub mod utility;
 pub mod mat2x3;
 pub mod mat4;
+pub mod quat;
 pub mod ray;
 pub mod vec2;
 pub mod vec3;

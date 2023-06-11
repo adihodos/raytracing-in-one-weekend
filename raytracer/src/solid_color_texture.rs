@@ -13,6 +13,12 @@ impl SolidColorTexture {
     }
 }
 
+impl std::convert::From<Color> for SolidColorTexture {
+    fn from(color: Color) -> Self {
+        Self { color }
+    }
+}
+
 impl Texture for SolidColorTexture {
     fn value(
         &self,

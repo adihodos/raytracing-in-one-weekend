@@ -1,30 +1,32 @@
 use super::mat2x3::Mat2X3;
 use super::vec4::TVec4;
+use crate::vec3::TVec3;
+use num::Float;
 use num_traits::Num;
 
 /// A 4x4 matrix, stored in row major ordering.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct Mat4<T> {
-    a00: T,
-    a01: T,
-    a02: T,
-    a03: T,
+    pub a00: T,
+    pub a01: T,
+    pub a02: T,
+    pub a03: T,
 
-    a10: T,
-    a11: T,
-    a12: T,
-    a13: T,
+    pub a10: T,
+    pub a11: T,
+    pub a12: T,
+    pub a13: T,
 
-    a20: T,
-    a21: T,
-    a22: T,
-    a23: T,
+    pub a20: T,
+    pub a21: T,
+    pub a22: T,
+    pub a23: T,
 
-    a30: T,
-    a31: T,
-    a32: T,
-    a33: T,
+    pub a30: T,
+    pub a31: T,
+    pub a32: T,
+    pub a33: T,
 }
 
 impl<T> Mat4<T>
@@ -68,6 +70,81 @@ where
             a31: self.a13,
             a32: self.a23,
             a33: self.a33,
+        }
+    }
+
+    pub fn translate(p: TVec3<T>) -> Self
+    where
+        T: Num + Copy + Clone + std::fmt::Debug,
+    {
+        Self {
+            a00: T::one(),
+            a01: T::zero(),
+            a02: T::zero(),
+            a03: p.x,
+
+            a10: T::zero(),
+            a11: T::one(),
+            a12: T::zero(),
+            a13: p.y,
+
+            a20: T::zero(),
+            a21: T::zero(),
+            a22: T::one(),
+            a23: p.z,
+
+            a30: T::zero(),
+            a31: T::zero(),
+            a32: T::zero(),
+            a33: T::one(),
+        }
+    }
+
+    pub fn non_uniform_scale(s: TVec3<T>) -> Self {
+        Self {
+            a00: s.x,
+            a01: T::zero(),
+            a02: T::zero(),
+            a03: T::zero(),
+
+            a10: T::zero(),
+            a11: s.y,
+            a12: T::zero(),
+            a13: T::zero(),
+
+            a20: T::zero(),
+            a21: T::zero(),
+            a22: s.z,
+            a23: T::zero(),
+
+            a30: T::zero(),
+            a31: T::zero(),
+            a32: T::zero(),
+            a33: T::one(),
+        }
+    }
+
+    pub fn uniform_scale(s: T) -> Self {
+        Self::non_uniform_scale((s, s, s).into())
+    }
+
+    pub fn column(&self, idx: usize) -> TVec4<T>
+    where
+        T: Num,
+    {
+        assert!(idx < 4);
+        let s = self.as_slice();
+
+        // a00 a01 a02 a03
+        // a10 a11 a12 a13
+        // a20 a21 a22 a23
+        // a30 a31 a32 a33
+
+        TVec4 {
+            x: s[idx],
+            y: s[idx + 4],
+            z: s[idx + 8],
+            w: s[idx + 12],
         }
     }
 }
@@ -199,6 +276,43 @@ where
     }
 }
 
+impl<T> std::convert::From<[[T; 4]; 4]> for Mat4<T>
+where
+    T: Num + Copy + Clone + std::fmt::Debug,
+{
+    fn from(arr: [[T; 4]; 4]) -> Self {
+        Self {
+            //
+            //
+            a00: arr[0][0],
+            a01: arr[0][1],
+            a02: arr[0][2],
+            a03: arr[0][3],
+
+            //
+            //
+            a10: arr[1][0],
+            a11: arr[1][1],
+            a12: arr[1][2],
+            a13: arr[1][3],
+
+            //
+            //
+            a20: arr[2][0],
+            a21: arr[2][1],
+            a22: arr[2][2],
+            a23: arr[2][3],
+
+            //
+            //
+            a30: arr[3][0],
+            a31: arr[3][1],
+            a32: arr[3][2],
+            a33: arr[3][3],
+        }
+    }
+}
+
 impl<T> std::convert::From<Mat2X3<T>> for Mat4<T>
 where
     T: Num + Copy + Clone + std::fmt::Debug,
@@ -311,6 +425,22 @@ where
     }
 }
 
+impl<T> std::ops::Mul<TVec4<T>> for Mat4<T>
+where
+    T: Num + Copy + Clone + std::ops::Mul<Output = T> + std::ops::Add<Output = T>,
+{
+    type Output = TVec4<T>;
+
+    fn mul(self, rhs: TVec4<T>) -> Self::Output {
+        TVec4 {
+            x: self.a00 * rhs.x + self.a01 * rhs.y + self.a02 * rhs.z + self.a03 * rhs.w,
+            y: self.a10 * rhs.x + self.a11 * rhs.y + self.a12 * rhs.z + self.a13 * rhs.w,
+            z: self.a20 * rhs.x + self.a21 * rhs.y + self.a22 * rhs.z + self.a23 * rhs.w,
+            w: rhs.w,
+        }
+    }
+}
+
 ///  Macro to generate scalar with Mat4 multiplication
 macro_rules! scalar_multiply_mat4 {
     ($stype:ty) => {
@@ -380,6 +510,89 @@ where
 
 pub type Mat4F32 = Mat4<f32>;
 pub type Mat4I32 = Mat4<i32>;
+
+pub fn det<T: Float>(m: &Mat4<T>) -> T {
+    //
+    // This computation is based on Laplace's theorem
+    // which states that the value of a determinant is equal to the product of
+    // the minor determinants formed with the elements of p rows/columns and
+    // their algebraic complements.
+    let k1 = m.a00 * m.a11 - m.a01 * m.a10;
+    let l1 = m.a22 * m.a33 - m.a23 * m.a32;
+
+    let k2 = m.a00 * m.a12 - m.a02 * m.a10;
+    let l2 = m.a21 * m.a33 - m.a12 * m.a31;
+
+    let k3 = m.a00 * m.a13 - m.a03 * m.a10;
+    let l3 = m.a21 * m.a32 - m.a22 * m.a31;
+
+    let k4 = m.a01 * m.a12 - m.a02 * m.a11;
+    let l4 = m.a20 * m.a33 - m.a32 * m.a30;
+
+    let k5 = m.a01 * m.a13 - m.a03 * m.a11;
+    let l5 = m.a20 * m.a32 - m.a22 * m.a30;
+
+    let k6 = m.a02 * m.a13 - m.a03 * m.a12;
+    let l6 = m.a20 * m.a31 - m.a21 * m.a30;
+
+    k1 * l1 - k2 * l2 + k3 * l3 + k4 * l4 - k5 * l5 + k6 * l6
+}
+
+pub fn is_invertible<T: Float>(m: &Mat4<T>) -> bool {
+    !det(m).is_zero()
+}
+
+pub fn adjoint<T: Float>(m: &Mat4<T>) -> Mat4<T> {
+    let m1 = m.a22 * m.a33 - m.a23 * m.a32;
+    let m2 = m.a21 * m.a33 - m.a23 * m.a31;
+    let m3 = m.a21 * m.a32 - m.a22 * m.a31;
+    let m4 = m.a02 * m.a13 - m.a03 * m.a12;
+    let m5 = m.a01 * m.a13 - m.a03 * m.a11;
+    let m6 = m.a01 * m.a12 - m.a02 * m.a11;
+    let m7 = m.a20 * m.a33 - m.a23 * m.a30;
+    let m8 = m.a20 * m.a32 - m.a22 * m.a30;
+    let m9 = m.a12 * m.a33 - m.a13 * m.a32;
+    let m10 = m.a10 * m.a33 - m.a13 * m.a30;
+    let m11 = m.a10 * m.a32 - m.a12 * m.a30;
+    let m12 = m.a00 * m.a13 - m.a03 * m.a10;
+    let m13 = m.a00 * m.a12 - m.a02 * m.a10;
+    let m14 = m.a20 * m.a31 - m.a21 * m.a30;
+    let m15 = m.a00 * m.a11 - m.a01 * m.a10;
+    let m16 = m.a20 * m.a31 - m.a21 * m.a30;
+
+    Mat4 {
+        a00: m.a11 * m1 - m.a12 * m2 + m.a13 * m3,
+        a01: -m.a01 * m1 + m.a02 * m2 - m.a03 * m3,
+        a02: m.a31 * m4 - m.a32 * m5 + m.a33 * m6,
+        a03: -m.a21 * m4 + m.a22 * m5 - m.a23 * m6,
+
+        a10: -m.a10 * m1 + m.a12 * m7 - m.a13 * m8,
+        a11: m.a00 * m1 - m.a02 * m7 + m.a03 * m8,
+        a12: -m.a00 * m9 + m.a02 * m10 - m.a03 * m11,
+        a13: m.a20 * m4 - m.a11 * m12 + m.a23 * m13,
+
+        a20: m.a10 * m2 - m.a11 * m7 + m.a13 * m16,
+        a21: -m.a00 * m2 + m.a01 * m7 - m.a03 * m16,
+        a22: m.a30 * m5 - m.a31 * m12 + m.a33 * m15,
+        a23: -m.a20 * m5 + m.a21 * m12 - m.a23 * m15,
+
+        a30: -m.a10 * m3 + m.a11 * m8 - m.a12 * m14,
+        a31: m.a00 * m3 - m.a01 * m8 + m.a02 * m14,
+        a32: -m.a30 * m6 + m.a31 * m13 - m.a32 * m15,
+        a33: m.a20 * m6 - m.a21 * m13 + m.a22 * m15,
+    }
+}
+
+pub fn invert<T: Float + std::fmt::Debug>(m: &Mat4<T>) -> Mat4<T> {
+    let d = det(m);
+    assert!(!d.is_zero(), "Matrix is not invertible");
+
+    if d.is_zero() {
+        *m
+    } else {
+        adjoint(m) * d.recip()
+    }
+}
 
 #[cfg(test)]
 mod tests {

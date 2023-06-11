@@ -31,10 +31,13 @@ mod rtow_types {
 use math::vec3::normalize;
 use rand::Rng;
 pub use rtow_types::*;
+pub type Vec2 = math::vec2::TVec2<Real>;
 pub type Vec3 = math::vec3::TVec3<Real>;
+pub type Vec4 = math::vec4::TVec4<Real>;
 pub type Ray = math::ray::TRay<Real>;
 pub type Point = Vec3;
 pub type Color = Vec3;
+pub type Mat4 = math::mat4::Mat4<Real>;
 
 pub fn degrees_to_radians(degrees: Real) -> Real {
     (degrees * C_PI) / 180 as Real
@@ -176,5 +179,48 @@ pub fn ffmax(a: Real, b: Real) -> Real {
         a
     } else {
         b
+    }
+}
+
+pub fn random_rotation_matrix() -> Mat4 {
+    let z = random_real();
+    let phi = C_TWO * C_PI * random_real();
+    let r = (C_ONE - z * z).sqrt();
+    let w = C_PI * random_real();
+
+    let (sin_phi, cos_phi) = phi.sin_cos();
+    let (sin_w, cos_w) = w.sin_cos();
+
+    let a = cos_w;
+    let b = sin_w * cos_phi * r;
+    let c = sin_w * sin_phi * r;
+    let d = sin_w * r;
+
+    Mat4 {
+        a00: C_ONE - C_TWO * (c * c + d * d),
+        a01: C_TWO * (b * c + a * d),
+        a02: C_TWO * (b * d - a * c),
+        a03: C_ZERO,
+
+        //
+        //
+        a10: C_TWO * (b * c - a * d),
+        a11: C_ONE - C_TWO * (b * b + d * d),
+        a12: C_TWO * (c * d + a * b),
+        a13: C_ZERO,
+
+        //
+        //
+        a20: C_TWO * (b * d + a * c),
+        a21: C_TWO * (c * d - a * b),
+        a22: C_ONE - C_TWO * (b * b + c * c),
+        a23: C_ZERO,
+
+        //
+        //
+        a30: C_ZERO,
+        a31: C_ZERO,
+        a32: C_ZERO,
+        a33: C_ONE,
     }
 }

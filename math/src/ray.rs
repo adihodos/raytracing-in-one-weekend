@@ -1,4 +1,7 @@
+use crate::mat4::Mat4;
 use crate::vec3::TVec3;
+use crate::vec4::TVec4;
+use num::Float;
 use num_traits::Num;
 
 /// Ray in R3.
@@ -33,5 +36,19 @@ where
             + std::ops::Mul<TVec3<T>, Output = TVec3<T>>,
     {
         self.origin + t * self.direction
+    }
+}
+
+pub fn transform<T>(mat: &Mat4<T>, ray: &TRay<T>) -> TRay<T>
+where
+    T: Float + std::fmt::Debug,
+{
+    let origin = (*mat * TVec4::from_vec3(&ray.origin, T::one())).xyz();
+    let direction = (*mat * TVec4::from_vec3(&ray.direction, T::zero())).xyz();
+
+    TRay {
+        origin,
+        direction,
+        ..*ray
     }
 }
