@@ -23,6 +23,7 @@ mod block;
 mod bvh;
 mod camera;
 mod checker_texture;
+mod cone;
 mod constant_medium;
 mod cylinder;
 mod dielectric;
@@ -65,6 +66,7 @@ use ui::UiBackend;
 use crate::{
     block::Block,
     bvh::BvhNode,
+    cone::Cone,
     constant_medium::ConstantMedium,
     cylinder::Cylinder,
     flip_face::FlipFace,
@@ -1122,6 +1124,20 @@ fn scene_mesh() -> (HittableList, HittableList) {
     let t = Mat4::translate((-40f32, 30f32, 30f32).into());
     let s = Mat4::non_uniform_scale((15f32, 15f32, 65f32).into());
     world.add(Arc::new(Transform::new(t * r * s, cyl)));
+
+    let cone_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid03.jpg",
+    ))));
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(90 as Real, vec3::consts::unit_x()));
+    let t = Mat4::translate((-25f32, 25f32, 50f32).into());
+    let s = Mat4::uniform_scale(25f32);
+    let cone = Arc::new(Cone::unit(cone_mtl));
+
+    world.add(Arc::new(Transform::new(t * r * s, cone.clone())));
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(-90 as Real, vec3::consts::unit_x()));
+    let t = Mat4::translate((25f32, 0f32, 50f32).into());
+    world.add(Arc::new(Transform::new(t * r * s, cone)));
 
     let mut lights = HittableList::new();
     lights.add(Arc::new(XZRect {
