@@ -18,3 +18,4 @@ cargo run --release
 ![thumbnail](./images/thumbnail4.png)
 ![thumbnail](./images/thumbnail5.png)
 ![thumbnail](./images/thumbnail6.png)
+![thumbnail](./images/thumbnail7.png)

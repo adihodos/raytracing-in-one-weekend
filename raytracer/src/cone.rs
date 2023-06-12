@@ -26,8 +26,8 @@ impl Cone {
         }
     }
 
-    pub fn unit(mtl: Arc<dyn Material>) -> Cone {
-        Self::new(C_ONE, C_ONE, C_TWO_PI, mtl)
+    pub fn unit(phi_max: Option<Real>, mtl: Arc<dyn Material>) -> Cone {
+        Self::new(C_ONE, C_ONE, phi_max.unwrap_or_else(|| C_TWO_PI), mtl)
     }
 }
 

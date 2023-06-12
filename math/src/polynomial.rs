@@ -1,7 +1,9 @@
 use num::Float;
 
 pub fn poly_linear<T: Float>(a: T, b: T, roots: &mut [T]) -> u32 {
-    assert!(!a.is_zero());
+    if a.is_zero() {
+        return 0;
+    }
     roots[0] = -b / a;
     1
 }

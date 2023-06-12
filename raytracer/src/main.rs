@@ -33,6 +33,7 @@ mod generic_handle;
 mod geometry_import;
 mod hittable;
 mod hittable_list;
+mod hyperboloid;
 mod image_texture;
 mod isotropic;
 mod lambertian;
@@ -41,6 +42,7 @@ mod metal;
 mod noise_texture;
 mod objects;
 mod onb;
+mod paraboloid;
 mod pdf;
 mod perlin;
 mod rectangles;
@@ -70,7 +72,9 @@ use crate::{
     constant_medium::ConstantMedium,
     cylinder::Cylinder,
     flip_face::FlipFace,
+    hyperboloid::Hyperboloid,
     objects::sphere::MovingSphere,
+    paraboloid::Paraboloid,
     rectangles::{XZRect, YZRect},
     transform::{RotateY, Translate},
 };
@@ -1131,13 +1135,35 @@ fn scene_mesh() -> (HittableList, HittableList) {
     let r = quat::to_rotation_matrix(quat::Quat::axis_angle(90 as Real, vec3::consts::unit_x()));
     let t = Mat4::translate((-25f32, 25f32, 50f32).into());
     let s = Mat4::uniform_scale(25f32);
-    let cone = Arc::new(Cone::unit(cone_mtl));
+    let cone = Arc::new(Cone::unit(None, cone_mtl.clone()));
 
     world.add(Arc::new(Transform::new(t * r * s, cone.clone())));
 
-    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(-90 as Real, vec3::consts::unit_x()));
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(-90 as Real, vec3::consts::unit_x()))
+        * quat::to_rotation_matrix(quat::Quat::axis_angle(-90 as Real, vec3::consts::unit_z()));
     let t = Mat4::translate((25f32, 0f32, 50f32).into());
+    let cone = Arc::new(
+        Cone::unit(Some(330f32.to_radians()), cone_mtl.clone()), // Cone::unit(None, cone_mtl.clone()),
+    );
     world.add(Arc::new(Transform::new(t * r * s, cone)));
+
+    let hyp_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid10.jpg",
+    ))));
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(90 as Real, vec3::consts::unit_x()));
+    let t = Mat4::translate((-0f32, 25f32, 100f32).into());
+    let s = Mat4::uniform_scale(25f32);
+
+    let hyp = Arc::new(Paraboloid::new(
+        0.5f32,
+        -0.5f32,
+        1f32,
+        C_TWO_PI,
+        hyp_mtl.clone(),
+    ));
+
+    world.add(Arc::new(Transform::new(t * r * s, hyp)));
 
     let mut lights = HittableList::new();
     lights.add(Arc::new(XZRect {
