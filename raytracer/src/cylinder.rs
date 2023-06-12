@@ -19,8 +19,14 @@ pub struct Cylinder {
 }
 
 impl Cylinder {
-    pub fn unit(mtl: Arc<dyn Material>) -> Self {
-        Self::new(C_ONE, -C_HALF_ONE, C_HALF_ONE, C_TWO_PI, mtl)
+    pub fn unit(phi_max: Option<Real>, mtl: Arc<dyn Material>) -> Self {
+        Self::new(
+            C_ONE,
+            -C_HALF_ONE,
+            C_HALF_ONE,
+            phi_max.unwrap_or_else(|| C_TWO_PI),
+            mtl,
+        )
     }
 
     pub fn new(radius: Real, z0: Real, z1: Real, phi_max: Real, mtl: Arc<dyn Material>) -> Self {

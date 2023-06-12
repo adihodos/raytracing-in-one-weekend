@@ -184,11 +184,14 @@ pub fn ffmax(a: Real, b: Real) -> Real {
     }
 }
 
+/// Generates a random rotation matrix. Based on Graphics Gems 2, pg. 378
 pub fn random_rotation_matrix() -> Mat4 {
-    let z = random_real();
-    let phi = C_TWO * C_PI * random_real();
+    let [x1, x2, x3] = [random_real(), random_real(), random_real()];
+
+    let z = x1;
+    let phi = C_TWO_PI * x2;
     let r = (C_ONE - z * z).sqrt();
-    let w = C_PI * random_real();
+    let w = C_PI * x3;
 
     let (sin_phi, cos_phi) = phi.sin_cos();
     let (sin_w, cos_w) = w.sin_cos();
@@ -196,7 +199,7 @@ pub fn random_rotation_matrix() -> Mat4 {
     let a = cos_w;
     let b = sin_w * cos_phi * r;
     let c = sin_w * sin_phi * r;
-    let d = sin_w * r;
+    let d = sin_w * z;
 
     Mat4 {
         a00: C_ONE - C_TWO * (c * c + d * d),
