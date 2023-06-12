@@ -16,4 +16,5 @@ pub mod color_conversion;
 pub mod color_palette;
 pub mod colormap;
 pub mod minmax;
+pub mod polynomial;
 pub mod projection;

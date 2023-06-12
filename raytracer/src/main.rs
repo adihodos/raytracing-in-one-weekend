@@ -24,6 +24,7 @@ mod bvh;
 mod camera;
 mod checker_texture;
 mod constant_medium;
+mod cylinder;
 mod dielectric;
 mod diffuse_light;
 mod flip_face;
@@ -65,6 +66,7 @@ use crate::{
     block::Block,
     bvh::BvhNode,
     constant_medium::ConstantMedium,
+    cylinder::Cylinder,
     flip_face::FlipFace,
     objects::sphere::MovingSphere,
     rectangles::{XZRect, YZRect},
@@ -1093,23 +1095,47 @@ fn scene_mesh() -> (HittableList, HittableList) {
     let block_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
         "data/textures/uv_grids/ash_uvgrid03.jpg",
     ))));
-    let block = Arc::new(Block::unit_cube(block_mtl));
-    // world.add(block.clone());
 
+    let block = Arc::new(Block::unit_cube(block_mtl));
+
+    use crate::transform::Transform;
+    use math::mat4;
     use math::quat;
     use math::vec3;
 
-    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(45 as Real, vec3::consts::unit_y()));
-    let t = Mat4::translate((35f32, 35f32, 0f32).into());
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(220 as Real, vec3::consts::unit_y()));
+    let t = Mat4::translate((65f32, 35f32, 0f32).into());
     let s = Mat4::uniform_scale(35f32);
-    let transformed_block = Arc::new(crate::transform::Transform::new(t * r * s, block.clone()));
+    let transformed_block = Arc::new(Transform::new(t * r * s, block.clone()));
     world.add(transformed_block);
 
     let r = random_rotation_matrix();
-    let s = 24f32;
-    let t = Mat4::translate((-35f32, 35f32, -20f32).into());
-    let transformed_block = Arc::new(crate::transform::Transform::new(t * r * s, block.clone()));
+    let s = Mat4::uniform_scale(25f32);
+    let t = Mat4::translate((-60f32, 35f32, 0f32).into());
+    let final_tf = t * r * s;
+    let transformed_block = Arc::new(Transform::new(final_tf, block.clone()));
     world.add(transformed_block);
+
+    let cyl_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid01.jpg",
+    ))));
+
+    let cyl = Arc::new(
+        Cylinder::unit(cyl_mtl), //     Cylinder::new(
+                                 //     5f32,
+                                 //     -5f32,
+                                 //     5f32,
+                                 //     360f32.to_radians(),
+                                 //     cyl_mtl,
+                                 // )
+    );
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(230 as Real, vec3::consts::unit_y()));
+    let t = Mat4::translate((0f32, 30f32, 10f32).into());
+    let s = Mat4::non_uniform_scale((15f32, 15f32, 65f32).into());
+
+    let transformed_cyl = Arc::new(Transform::new(t * r * s, cyl));
+    world.add(transformed_cyl);
 
     let mut lights = HittableList::new();
     lights.add(Arc::new(XZRect {

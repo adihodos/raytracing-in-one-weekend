@@ -11,6 +11,7 @@ mod rtow_types {
     pub const C_HALF_ONE: Real = 0.5;
     pub const C_TWO: Real = 2.0;
     pub const C_ZERO: Real = 0.0;
+    pub const C_TWO_PI: Real = C_PI * C_TWO;
     pub const FP_MODEL: &'static str = "double";
 }
 
@@ -25,6 +26,7 @@ mod rtow_types {
     pub const C_HALF_ONE: Real = 0.5f32;
     pub const C_TWO: Real = 2.0f32;
     pub const C_ZERO: Real = 0.0f32;
+    pub const C_TWO_PI: Real = C_PI * C_TWO;
     pub const FP_MODEL: &'static str = "single";
 }
 

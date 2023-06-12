@@ -168,7 +168,7 @@ impl Transform {
         Transform {
             obj2world,
             world2object,
-            normal2world: world2object.transpose(),
+            normal2world: mat4::adjoint(&world2object).transpose(),
             obj,
         }
     }

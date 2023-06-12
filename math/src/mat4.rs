@@ -569,7 +569,7 @@ pub fn adjoint<T: Float>(m: &Mat4<T>) -> Mat4<T> {
         a10: -m.a10 * m1 + m.a12 * m7 - m.a13 * m8,
         a11: m.a00 * m1 - m.a02 * m7 + m.a03 * m8,
         a12: -m.a00 * m9 + m.a02 * m10 - m.a03 * m11,
-        a13: m.a20 * m4 - m.a11 * m12 + m.a23 * m13,
+        a13: m.a20 * m4 - m.a22 * m12 + m.a23 * m13,
 
         a20: m.a10 * m2 - m.a11 * m7 + m.a13 * m16,
         a21: -m.a00 * m2 + m.a01 * m7 - m.a03 * m16,

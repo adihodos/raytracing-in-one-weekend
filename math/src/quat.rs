@@ -74,10 +74,12 @@ where
         if lensquared.is_zero() {
             self::consts::identity()
         } else {
-            let angle = angle.to_radians();
-            let scale_factor = (angle / (T::one() + T::one())).sin() / lensquared.sqrt();
+            let angle = angle.to_radians() / (T::one() + T::one());
+            let (sin_theta, cos_theta) = angle.sin_cos();
+
+            let scale_factor = sin_theta / lensquared.sqrt();
             Self {
-                w: (angle / (T::one() + T::one())).cos(),
+                w: cos_theta,
                 x: axis.x * scale_factor,
                 y: axis.y * scale_factor,
                 z: axis.z * scale_factor,
@@ -262,48 +264,32 @@ where
 }
 
 pub fn to_rotation_matrix<T: Float>(q: Quat<T>) -> Mat4<T> {
-    let two: T = T::one() + T::one();
-
-    let s = two / length_squared(q);
-
-    let xs = s * q.x;
-    let ys = s * q.y;
-    let zs = s * q.z;
-
-    let wx = q.w * xs;
-    let wy = q.w * ys;
-    let wz = q.w * zs;
-
-    let xx = q.x * xs;
-    let xy = q.x * ys;
-    let xz = q.x * zs;
-
-    let yy = q.y * ys;
-    let yz = q.y * zs;
-
-    let zz = q.z * zs;
+    let s = (T::one() + T::one()) / length_squared(q);
 
     Mat4 {
         //
-        // 1st row
-        a00: T::one() - (yy + zz),
-        a01: xy - wz,
-        a02: xz + wy,
+        //
+        a00: T::one() - s * (q.y * q.y + q.z * q.z),
+        a01: s * (q.x * q.y - q.w * q.z),
+        a02: s * (q.x * q.z + q.w * q.y),
         a03: T::zero(),
+
         //
-        // 2nd row
-        a10: xy + wz,
-        a11: T::one() - (xx + zz),
-        a12: yz - wx,
+        //
+        a10: s * (q.x * q.y + q.w * q.z),
+        a11: T::one() - s * (q.x * q.x + q.z * q.z),
+        a12: s * (q.y * q.z - q.w * q.x),
         a13: T::zero(),
+
         //
-        // 3rd row
-        a20: xz - wy,
-        a21: yz + wx,
-        a22: T::one() - (xx + yy),
+        //
+        a20: s * (q.x * q.z - q.w * q.y),
+        a21: s * (q.y * q.z + q.w * q.x),
+        a22: T::one() - s * (q.x * q.x + q.y * q.y),
         a23: T::zero(),
+
         //
-        // 4th row
+        //
         a30: T::zero(),
         a31: T::zero(),
         a32: T::zero(),

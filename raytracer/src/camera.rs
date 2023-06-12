@@ -35,6 +35,7 @@ impl Camera {
         let half_height = (theta / 2 as Real).tan();
         let half_width = aspect_ratio * half_height;
 
+        //
         // view direction vector
         let w = normalize(lookfrom - lookat);
         // vector to the right of the view direction
