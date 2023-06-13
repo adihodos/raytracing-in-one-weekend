@@ -38,6 +38,8 @@ impl Hittable for Cone {
         _t_min: Real,
         t_max: Real,
     ) -> Option<crate::hittable::HitRecord> {
+        //
+        // Physically based rendering, section 3.5.1, page 133
         let k = self.radius / self.height;
         let k = k * k;
 
