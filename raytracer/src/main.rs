@@ -1087,7 +1087,6 @@ fn scene_mesh() -> (HittableList, HittableList) {
     let block = Arc::new(Block::unit_cube(block_mtl));
 
     use crate::transform::Transform;
-    use math::mat4;
     use math::quat;
     use math::vec3;
 
@@ -1142,9 +1141,7 @@ fn scene_mesh() -> (HittableList, HittableList) {
     let r = quat::to_rotation_matrix(quat::Quat::axis_angle(-90 as Real, vec3::consts::unit_x()))
         * quat::to_rotation_matrix(quat::Quat::axis_angle(-90 as Real, vec3::consts::unit_z()));
     let t = Mat4::translate((25f32, 0f32, 50f32).into());
-    let cone = Arc::new(
-        Cone::unit(Some(330f32.to_radians()), cone_mtl.clone()), // Cone::unit(None, cone_mtl.clone()),
-    );
+    let cone = Arc::new(Cone::unit(Some(330f32.to_radians()), cone_mtl.clone()));
     world.add(Arc::new(Transform::new(t * r * s, cone)));
 
     let hyp_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
@@ -1163,7 +1160,21 @@ fn scene_mesh() -> (HittableList, HittableList) {
         hyp_mtl.clone(),
     ));
 
-    world.add(Arc::new(Transform::new(t * r * s, hyp)));
+    world.add(Arc::new(Transform::new(t * r * s, hyp.clone())));
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(-120 as Real, vec3::consts::unit_y()))
+        * quat::to_rotation_matrix(quat::Quat::axis_angle(90 as Real, vec3::consts::unit_x()));
+    let t = Mat4::translate((-30f32, 25f32, 100f32).into());
+    let s = Mat4::uniform_scale(25f32);
+    let hyp = Arc::new(Paraboloid::new(
+        0.5f32,
+        -0.5f32,
+        1f32,
+        300f32.to_radians(),
+        hyp_mtl.clone(),
+    ));
+
+    world.add(Arc::new(Transform::new(t * r * s, hyp.clone())));
 
     let mut lights = HittableList::new();
     lights.add(Arc::new(XZRect {
