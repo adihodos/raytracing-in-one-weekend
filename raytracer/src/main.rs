@@ -3,20 +3,18 @@
 use std::{
     iter::FromIterator,
     os::raw::c_void,
-    path::Path,
     sync::{mpsc::Receiver, Arc},
 };
 
 use checker_texture::CheckerTexture;
 use diffuse_light::DiffuseLight;
+
 use image_texture::ImageTexture;
 use material::{Material, ScatterRecord};
 use noise_texture::NoiseTexture;
 use pdf::{HittablePdf, MixturePdf, Pdf};
 use rectangles::XYRect;
 use serde::{Deserialize, Serialize};
-
-mod ui;
 
 mod aabb3;
 mod block;
@@ -49,7 +47,9 @@ mod rectangles;
 mod solid_color_texture;
 mod texture;
 mod transform;
+mod triangle_mesh;
 mod types;
+mod ui;
 
 use dielectric::Dielectric;
 use hittable::Hittable;
@@ -76,6 +76,7 @@ use crate::{
     paraboloid::Paraboloid,
     rectangles::{XZRect, YZRect},
     transform::{RotateY, Translate},
+    triangle_mesh::TriangleMesh,
 };
 
 #[derive(Copy, Clone)]
@@ -96,7 +97,7 @@ fn ray_color(
     depth: i32,
 ) -> Color {
     if depth <= 0 {
-        return Color::broadcast(0 as Real);
+        return Color::broadcast(C_ZERO);
     }
 
     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
@@ -150,6 +151,7 @@ enum Scene {
     CornellBox,
     Chapter2Final,
     MeshTest,
+    GeometricPrimitives,
 }
 
 fn scene_random_world() -> (HittableList, HittableList) {
@@ -534,7 +536,7 @@ fn scene_cornell_box() -> (HittableList, HittableList) {
     });
     world.add(light);
 
-    let aluminium = Arc::new(Metal::new((0.8f32, 0.85f32, 0.88f32), 0f32));
+    // let aluminium = Arc::new(Metal::new((0.8f32, 0.85f32, 0.88f32), 0f32));
 
     let box1 = Arc::new(Block::new(
         (0f32, 0f32, 0f32),
@@ -887,175 +889,10 @@ fn scene_final_chapter2() -> (HittableList, HittableList) {
         mtl: light_mtl.clone(),
     }));
 
-    // lights.add(Arc::new(Sphere::new(
-    //     (190f32, 90f32, 190f32).into(),
-    //     90f32,
-    //     light_mtl.clone(),
-    // )));
-
     (world, lights)
 }
 
-struct Mesh {
-    geometry: geometry_import::ImportedGeometry,
-    mtl: Arc<dyn Material>,
-}
-
-impl Mesh {
-    fn from_file<P: AsRef<Path>>(p: P) -> Mesh {
-        let geometry = geometry_import::ImportedGeometry::import_from_file(&p)
-            .expect("Failed to import teapot model");
-        eprintln!(
-            "Model: vertices {}, indices {}, nodes {}, bounding box {:?}",
-            geometry.vertices().len(),
-            geometry.indices().len(),
-            geometry.nodes().len(),
-            geometry.aabb
-        );
-
-        Mesh {
-            geometry,
-            mtl: Arc::new(Lambertian::new((0f32, 1f32, 1f32))),
-        }
-    }
-
-    fn triangle_ray_intersect(
-        v0: &geometry_import::GeometryVertex,
-        v1: &geometry_import::GeometryVertex,
-        v2: &geometry_import::GeometryVertex,
-        ray: &Ray,
-        t_min: Real,
-        t_max: Real,
-        mtl: Arc<dyn Material>,
-    ) -> Option<hittable::HitRecord> {
-        use math::vec3::{are_on_the_same_plane_side, cross, dot, normalize};
-
-        let c0 = v1.pos - v0.pos;
-        let c1 = v2.pos - v1.pos;
-        let n = normalize(cross(c0, c1));
-
-        //
-        // check if the ray hits the triangle plane (use v0 as origin)
-        let d = dot(n, v0.pos);
-
-        const EPSILON: Real = 1.0E-5 as Real;
-        let b_dot_n = dot(ray.direction, n);
-
-        if b_dot_n.abs() < EPSILON {
-            //
-            // ray is parallel or contained in the triangle's plane
-            return None;
-        }
-
-        //
-        // compute point of intersection on the triangle's plane
-        let a_dot_n = dot(ray.origin, n);
-        let t = (d - a_dot_n) / b_dot_n;
-
-        if !(t < t_max && t > t_min) {
-            //
-            // intersection point is behind the ray
-            return None;
-        }
-
-        let p = ray.at(t);
-
-        let vertices = [v0.pos, v1.pos, v2.pos];
-
-        //
-        // check if the point lies inside the triangle
-        let containment_tests_failed = [(0, 1), (1, 2), (2, 0)].iter().any(|vertex_indices| {
-            // direction vector along the edge
-            let edge_vec = vertices[vertex_indices.1] - vertices[vertex_indices.0];
-            // direction vector from the vertex to the intersection point with the ray
-            let intersect_point_vec = p - vertices[vertex_indices.0];
-            // orthogonal vector to the above two vectors
-            let orthogonal_vec = cross(edge_vec, intersect_point_vec);
-
-            !are_on_the_same_plane_side(orthogonal_vec, n)
-        });
-
-        if containment_tests_failed {
-            //
-            // point is on the plane defined by the triangle's vertices but
-            // outside the triangle
-            return None;
-        }
-
-        //
-        // Point lies inside the triangle
-        Some(hittable::HitRecord::new(
-            p, n, ray, t, mtl, v0.uv.x, v0.uv.y,
-        ))
-    }
-}
-
-impl Hittable for Mesh {
-    fn bounding_box(&self, time0: Real, time1: Real) -> Option<aabb3::Aabb> {
-        Some(self.geometry.aabb)
-    }
-
-    fn hit(&self, r: &Ray, t_min: Real, t_max: Real) -> Option<hittable::HitRecord> {
-        if self.geometry.aabb.hit(r, t_min, t_max) {
-            for node in self.geometry.nodes().iter() {
-                if !node.aabb.hit(r, t_min, t_max) {
-                    continue;
-                }
-
-                let start = node.index_range.start;
-                let end = node.index_range.end;
-
-                assert!((end - start) % 3 == 0);
-
-                let mut i = 0usize;
-
-                while i < end / 3 {
-                    let v0 = self.geometry.vertices()[self.geometry.indices()[i + 0] as usize];
-                    let v1 = self.geometry.vertices()[self.geometry.indices()[i + 1] as usize];
-                    let v2 = self.geometry.vertices()[self.geometry.indices()[i + 2] as usize];
-
-                    let intersect_result = Self::triangle_ray_intersect(
-                        &v0,
-                        &v1,
-                        &v2,
-                        r,
-                        t_min,
-                        t_max,
-                        self.mtl.clone(),
-                    );
-
-                    if intersect_result.is_some() {
-                        return intersect_result;
-                    }
-
-                    i += 3;
-                }
-            }
-        }
-
-        None
-    }
-}
-
-fn scene_mesh() -> (HittableList, HittableList) {
-    // let geometry =
-    //     geometry_import::ImportedGeometry::import_from_file(&"data/models/teapot/pyramid.glb")
-    //         .expect("Failed to import teapot model");
-    // eprintln!(
-    //     "Model: vertices {}, indices {}, nodes {}",
-    //     geometry.vertices().len(),
-    //     geometry.indices().len(),
-    //     geometry.nodes().len()
-    // );
-
-    // geometry
-    //     .nodes()
-    //     .iter()
-    //     .filter(|node| !node.index_range.is_empty())
-    //     .for_each(|node| {
-    //         eprintln!("Node {:?}, bbox {:?}", node.index_range, node.aabb);
-    //     });
-
+fn scene_geometric_primitives() -> (HittableList, HittableList) {
     let mut world = HittableList::new();
 
     //
@@ -1085,8 +922,6 @@ fn scene_mesh() -> (HittableList, HittableList) {
             mtl: Arc::new(DiffuseLight::from((1f32, 1f32, 1f32))),
         }),
     }));
-
-    // world.add(Arc::new(Mesh::from_file("data/models/teapot/pyramid.glb")));
 
     let block_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
         "data/textures/uv_grids/ash_uvgrid03.jpg",
@@ -1183,6 +1018,68 @@ fn scene_mesh() -> (HittableList, HittableList) {
     ));
 
     world.add(Arc::new(Transform::new(t * r * s, hyp.clone())));
+
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: -1000f32,
+        x1: 1000f32,
+        z0: -1000f32,
+        z1: 1000f32,
+        k: 1000f32,
+        mtl: Arc::<DiffuseLight>::new((0f32, 0f32, 0f32).into()),
+    }));
+
+    (world, lights)
+}
+
+fn scene_mesh() -> (HittableList, HittableList) {
+    let mut world = HittableList::new();
+
+    //
+    // add floor
+    let floor_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid01.jpg",
+    ))));
+
+    let floor = Arc::new(XZRect {
+        x0: -1000f32,
+        x1: 1000f32,
+        z0: -1000f32,
+        z1: 1000f32,
+        k: 0f32,
+        mtl: floor_mtl,
+    });
+
+    world.add(floor);
+
+    world.add(Arc::new(FlipFace {
+        obj: Arc::new(XZRect {
+            x0: -1000f32,
+            x1: 1000f32,
+            z0: -1000f32,
+            z1: 1000f32,
+            k: 1000f32,
+            mtl: Arc::new(DiffuseLight::from((1f32, 1f32, 1f32))),
+        }),
+    }));
+
+    let teapot_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid09.jpg",
+    ))));
+
+    use math::{mat4, quat, vec3};
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(180f32, vec3::consts::unit_x()));
+    let t = mat4::Mat4::translate((0f32, 0f32, 0f32).into());
+    let xf = t * r;
+
+    let model_file =
+        // "data/models/cone.glb";
+    "data/models/teapot/teapot.glb";
+    // "data/models/teapot.lid.glb";
+
+    let teapot = Arc::new(TriangleMesh::from_file(&model_file, xf, teapot_mtl));
+    world.add(teapot);
 
     let mut lights = HittableList::new();
     lights.add(Arc::new(XZRect {
@@ -1359,9 +1256,10 @@ impl RaytracerState {
             Scene::CornellBox => scene_cornell_box(),
             Scene::Chapter2Final => scene_final_chapter2(),
             Scene::SimpleLight => scene_simple_light(),
-            Scene::MeshTest => scene_mesh(),
             Scene::PerlinSpheres => scene_two_perlin_spheres(),
             Scene::TwoSpheres => scene_two_spheres(),
+            Scene::GeometricPrimitives => scene_geometric_primitives(),
+            Scene::MeshTest => scene_mesh(),
             _ => todo!("Unimplemented"),
         };
 

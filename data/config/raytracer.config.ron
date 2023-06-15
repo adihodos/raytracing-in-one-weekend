@@ -72,7 +72,7 @@
                 background: (0.0, 0.0, 0.0),
         ))),
 
-        (MeshTest,
+        (GeometricPrimitives,
            Some((
                 workers: 12,
                 worker_block_pixels: 8,
@@ -82,6 +82,24 @@
                 max_ray_depth: 50,
                 vertical_fov: 75.0,
                 look_from: (0.0, 65.0, 150.0),
+                look_at: (0.0, 0.0, 0.0),
+                world_up: (0.0, 1.0, 0.0),
+                aperture: 0.0,
+                focus_dist: 10.0,
+                shuffle_workblocks: true,
+                background: (0.0, 0.0, 0.0),
+        ))),
+
+        (MeshTest,
+           Some((
+                workers: 12,
+                worker_block_pixels: 8,
+                aspect_ratio: 1.333333,
+                image_width: 800,
+                samples_per_pixel: 4,
+                max_ray_depth: 50,
+                vertical_fov: 65.0,
+                look_from: (0.0, 25.0, 20.0),
                 look_at: (0.0, 0.0, 0.0),
                 world_up: (0.0, 1.0, 0.0),
                 aperture: 0.0,

@@ -27,13 +27,22 @@ impl ImageTexture {
             ))
             .decode()
             .expect(&format!("Failed to decode image {}", p.as_ref().display()))
-            .into_rgb8();
+            .into_rgba8();
 
         Self {
             width: img.width(),
             height: img.height(),
-            bytes_per_scanline: img.width() * 3,
+            bytes_per_scanline: img.width() * 4,
             pixels: img.to_vec(),
+        }
+    }
+
+    pub fn from_pixels(width: u32, height: u32, pixels: &[u8]) -> Self {
+        Self {
+            width,
+            height,
+            bytes_per_scanline: (width * 4),
+            pixels: pixels.to_vec(),
         }
     }
 }
@@ -67,7 +76,7 @@ impl Texture for ImageTexture {
         }
 
         let color_scale = 1.0f32 / 255.0f32;
-        let start_idx = j as usize * self.bytes_per_scanline as usize + i as usize * 3;
+        let start_idx = j as usize * self.bytes_per_scanline as usize + i as usize * 4;
 
         Color::new(
             color_scale * self.pixels[start_idx + 0] as f32,

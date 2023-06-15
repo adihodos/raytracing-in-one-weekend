@@ -441,6 +441,28 @@ where
     }
 }
 
+pub fn transform_point<T>(m: &Mat4<T>, p: TVec3<T>) -> TVec3<T>
+where
+    T: Num + Copy + Clone + std::ops::Mul<Output = T> + std::ops::Add<Output = T>,
+{
+    TVec3 {
+        x: m.a00 * p.x + m.a01 * p.y + m.a02 * p.z + m.a03,
+        y: m.a10 * p.x + m.a11 * p.y + m.a12 * p.z + m.a13,
+        z: m.a20 * p.x + m.a21 * p.y + m.a22 * p.z + m.a23,
+    }
+}
+
+pub fn transform_vector<T>(m: &Mat4<T>, p: TVec3<T>) -> TVec3<T>
+where
+    T: Num + Copy + Clone + std::ops::Mul<Output = T> + std::ops::Add<Output = T>,
+{
+    TVec3 {
+        x: m.a00 * p.x + m.a01 * p.y + m.a02 * p.z,
+        y: m.a10 * p.x + m.a11 * p.y + m.a12 * p.z,
+        z: m.a20 * p.x + m.a21 * p.y + m.a22 * p.z,
+    }
+}
+
 ///  Macro to generate scalar with Mat4 multiplication
 macro_rules! scalar_multiply_mat4 {
     ($stype:ty) => {

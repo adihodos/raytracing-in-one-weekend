@@ -29,7 +29,7 @@ pub struct GeometryNode {
     pub name: String,
     pub transform: Mat4,
     pub aabb: Aabb,
-    pub index_range: Range<usize>,
+    pub indices: Vec<u32>,
 }
 
 impl std::default::Default for GeometryNode {
@@ -39,7 +39,7 @@ impl std::default::Default for GeometryNode {
             name: String::new(),
             transform: math::mat4::consts::identity(),
             aabb: Aabb::default(),
-            index_range: Range { start: 0, end: 0 },
+            indices: Vec::new(),
         }
     }
 }
@@ -336,7 +336,7 @@ impl ImportedGeometry {
             name: node.name().unwrap_or("unknown").into(),
             transform: node_matrix,
             aabb: Aabb::default(),
-            index_range: Range { start: 0, end: 0 },
+            indices: Vec::new(),
         });
 
         node.children()
@@ -437,10 +437,8 @@ impl ImportedGeometry {
                 );
             }
 
-            self.nodes[node_id as usize].index_range = Range {
-                start: idx_start,
-                end: self.indices.len(),
-            };
+            let ext = &self.indices[idx_start..];
+            self.nodes[node_id as usize].indices.extend(ext);
         }
     }
 
