@@ -44,6 +44,7 @@ mod paraboloid;
 mod pdf;
 mod perlin;
 mod rectangles;
+mod sampling;
 mod solid_color_texture;
 mod texture;
 mod transform;
@@ -1273,6 +1274,7 @@ impl RaytracerState {
         let lights = Arc::new(lights);
 
         let (tx, rx) = std::sync::mpsc::channel::<RaytracedPixel>();
+        let s = crate::sampling::MultiJitteredSampler::new(params.samples_per_pixel, None);
 
         let workers = (0..params.workers)
             .map(|worker_idx| {
@@ -1283,6 +1285,7 @@ impl RaytracerState {
                 let cancel_token = Arc::clone(&cancel_token);
                 let light = lights.clone();
                 let tx = tx.clone();
+                let mut s = s.clone();
 
                 std::thread::spawn(move || loop {
                     if cancel_token.load(std::sync::atomic::Ordering::SeqCst) {
@@ -1309,10 +1312,11 @@ impl RaytracerState {
                                     let pixel_color = (0..params.samples_per_pixel).fold(
                                         Color::broadcast(0 as Real),
                                         |color, _| {
-                                            let u = (x as Real + random_real())
+                                            let off = s.sample_unit_square();
+                                            let u = (x as Real + off.x)
                                                 / (params.image_width - 1) as Real;
                                             let v = 1 as Real
-                                                - (y as Real + random_real())
+                                                - (y as Real + off.y)
                                                     / (params.image_height - 1) as Real;
                                             let r = cam.get_ray(u, v);
                                             color
