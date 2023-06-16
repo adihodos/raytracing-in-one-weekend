@@ -1318,7 +1318,7 @@ impl RaytracerState {
                                             let v = 1 as Real
                                                 - (y as Real + off.y)
                                                     / (params.image_height - 1) as Real;
-                                            let r = cam.get_ray(u, v);
+                                            let r = cam.get_ray_ortho(u, v, &mut s);
                                             color
                                                 + ray_color(
                                                     &r,

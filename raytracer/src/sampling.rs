@@ -1,16 +1,20 @@
-use crate::types::{random_int, random_real, Real, Vec2, C_HALF_ONE};
-use num::integer::Roots;
+use crate::types::{
+    random_int, random_real, Real, Vec2, Vec3, C_HALF_ONE, C_ONE, C_TWO, C_TWO_PI, C_ZERO,
+};
+use num::{integer::Roots, Zero};
 
-pub trait SampleGen {
+pub trait SampleStrategy {
     fn generate_samples(sets: u32, samples_in_set: u32) -> Vec<Vec2>;
 }
 
 #[derive(Clone)]
 pub struct SamplerBase<T>
 where
-    T: SampleGen,
+    T: SampleStrategy,
 {
     samples: Vec<Vec2>,
+    disk_samples: Vec<Vec2>,
+    hemisphere_samples: Vec<Vec3>,
     shuffled_indices: Vec<u32>,
     sets: u32,
     samples_in_set: u32,
@@ -21,7 +25,7 @@ where
 
 impl<T> SamplerBase<T>
 where
-    T: SampleGen,
+    T: SampleStrategy,
 {
     pub fn new(num_samples: i32, num_sets: Option<i32>) -> Self {
         let num_sets = num_sets.unwrap_or(83);
@@ -60,8 +64,67 @@ where
             shuffled_indices.extend(indices.clone());
         });
 
+        //
+        // map unit square samples to unit disk
+        let disk_samples = samples
+            .iter()
+            .map(|&s| {
+                let sp = C_TWO * s - Vec2::broadcast(C_ONE);
+
+                let (r, phi) = if sp.x > -sp.y {
+                    if sp.x > sp.y {
+                        // sector 1
+                        (sp.x, sp.y / sp.x)
+                    } else {
+                        // sector2
+                        (sp.y, C_TWO - sp.x / sp.y)
+                    }
+                } else {
+                    if sp.x < sp.y {
+                        // sector 3
+                        (-sp.x, C_TWO * C_TWO + sp.y / sp.x)
+                    } else {
+                        // sector 4
+                        let r = -sp.y;
+                        let phi = if !sp.y.is_zero() {
+                            6 as Real - sp.x / sp.y
+                        } else {
+                            C_ZERO
+                        };
+
+                        (r, phi)
+                    }
+                };
+
+                let phi = phi * (0.25 as Real);
+                let (sin_phi, cos_phi) = phi.sin_cos();
+
+                Vec2 {
+                    x: r * cos_phi,
+                    y: r * sin_phi,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let hemisphere_samples = samples
+            .iter()
+            .map(|&s| {
+                let (sin_phi, cos_phi) = (C_TWO_PI * s).x.sin_cos();
+                let cos_theta = (C_ONE - s.y).powf(C_ONE / (C_ONE + std::f32::consts::E));
+                let sin_theta = (C_ONE - cos_theta * cos_theta).sqrt();
+
+                Vec3 {
+                    x: sin_theta * cos_phi,
+                    y: sin_theta * sin_phi,
+                    z: cos_theta,
+                }
+            })
+            .collect::<Vec<_>>();
+
         Self {
             samples,
+            disk_samples,
+            hemisphere_samples,
             shuffled_indices,
             count: 0,
             jump: 0,
@@ -84,12 +147,40 @@ where
         self.count += 1;
         s
     }
+
+    pub fn sample_unit_disk(&mut self) -> Vec2 {
+        if self.count % self.samples_in_set as usize == 0 {
+            self.jump = (random_int(0, std::i32::MAX - 1) % (self.sets as i32)
+                * self.samples_in_set as i32) as usize;
+        }
+
+        let s = self.disk_samples[self.jump
+            + self.shuffled_indices[self.jump + (self.count % self.samples_in_set as usize)]
+                as usize];
+
+        self.count += 1;
+        s
+    }
+
+    pub fn sample_unit_hemisphere(&mut self) -> Vec3 {
+        if self.count % self.samples_in_set as usize == 0 {
+            self.jump = (random_int(0, std::i32::MAX - 1) % (self.sets as i32)
+                * self.samples_in_set as i32) as usize;
+        }
+
+        let s = self.hemisphere_samples[self.jump
+            + self.shuffled_indices[self.jump + (self.count % self.samples_in_set as usize)]
+                as usize];
+
+        self.count += 1;
+        s
+    }
 }
 
 #[derive(Clone)]
 pub struct NRooksSamplingStrategy {}
 
-impl SampleGen for NRooksSamplingStrategy {
+impl SampleStrategy for NRooksSamplingStrategy {
     fn generate_samples(sets: u32, samples_in_set: u32) -> Vec<Vec2> {
         let mut samples = Vec::<Vec2>::with_capacity((sets * samples_in_set) as usize);
 
@@ -113,11 +204,11 @@ pub type NRooksSampler = SamplerBase<NRooksSamplingStrategy>;
 #[derive(Clone)]
 pub struct JitteredSamplingStrategy {}
 
-impl SampleGen for JitteredSamplingStrategy {
+impl SampleStrategy for JitteredSamplingStrategy {
     fn generate_samples(sets: u32, samples_in_set: u32) -> Vec<Vec2> {
         let mut samples = Vec::<Vec2>::with_capacity((sets * samples_in_set) as usize);
         let n = samples_in_set.sqrt();
-        for p in 0..sets {
+        for _p in 0..sets {
             for j in 0..n {
                 for k in 0..n {
                     let pt = Vec2 {
@@ -139,13 +230,13 @@ pub type JitteredSampler = SamplerBase<JitteredSamplingStrategy>;
 #[derive(Clone)]
 pub struct MultiJitteredSamplingStrategy {}
 
-impl SampleGen for MultiJitteredSamplingStrategy {
+impl SampleStrategy for MultiJitteredSamplingStrategy {
     fn generate_samples(sets: u32, samples_in_set: u32) -> Vec<Vec2> {
         let n = samples_in_set.sqrt();
         let subcell_width = (samples_in_set as Real).recip();
         let mut samples = Vec::<Vec2>::with_capacity((sets * samples_in_set) as usize);
 
-        for p in 0..sets {
+        for _p in 0..sets {
             for i in 0..n {
                 for j in 0..n {
                     let pt = Vec2 {
@@ -166,12 +257,12 @@ pub type MultiJitteredSampler = SamplerBase<MultiJitteredSamplingStrategy>;
 #[derive(Clone)]
 pub struct SimpleSamplingStrategy {}
 
-impl SampleGen for SimpleSamplingStrategy {
+impl SampleStrategy for SimpleSamplingStrategy {
     fn generate_samples(sets: u32, samples_in_set: u32) -> Vec<Vec2> {
         let mut samples = Vec::<Vec2>::with_capacity((sets * samples_in_set) as usize);
 
         let n = samples_in_set.sqrt();
-        for j in 0..sets {
+        for _j in 0..sets {
             for p in 0..n {
                 for q in 0..n {
                     let pt = Vec2 {

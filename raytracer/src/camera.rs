@@ -1,6 +1,9 @@
 use rand::Rng;
 
-use crate::types::{Point, Ray, Real, Vec3};
+use crate::{
+    sampling::{SampleStrategy, SamplerBase},
+    types::{Point, Ray, Real, Vec3},
+};
 
 #[derive(Copy, Clone)]
 pub struct Camera {
@@ -70,5 +73,21 @@ impl Camera {
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
             rand::thread_rng().gen_range(self.time0, self.time1),
         )
+    }
+
+    pub fn get_ray_ortho<S: SampleStrategy>(
+        &self,
+        s: Real,
+        t: Real,
+        smp: &mut SamplerBase<S>,
+    ) -> Ray {
+        let rd = self.lens_radius * smp.sample_unit_disk();
+        let offset = self.u * rd.x + self.v * rd.y;
+
+        Ray {
+            origin: self.lower_left_corner + s * self.horizontal + t * self.vertical + offset,
+            direction: -self.w,
+            time: crate::types::random_real_range(self.time0, self.time1),
+        }
     }
 }

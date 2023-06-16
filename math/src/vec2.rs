@@ -19,7 +19,7 @@ where
         TVec2 { x, y }
     }
 
-    pub fn same(t: T) -> Self {
+    pub fn broadcast(t: T) -> Self {
         Self::new(t, t)
     }
 
@@ -61,7 +61,7 @@ pub mod consts {
     where
         T: Num + Copy + Clone + std::fmt::Debug,
     {
-        TVec2::same(T::zero())
+        TVec2::broadcast(T::zero())
     }
 
     /// Unit vector along the X axis (1, 0)
