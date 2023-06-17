@@ -10,9 +10,7 @@ use checker_texture::CheckerTexture;
 use diffuse_light::DiffuseLight;
 
 use image_texture::ImageTexture;
-use material::{Material, ScatterRecord};
 use noise_texture::NoiseTexture;
-use pdf::{HittablePdf, MixturePdf, Pdf};
 use rectangles::XYRect;
 use serde::{Deserialize, Serialize};
 
@@ -90,57 +88,57 @@ struct RaytracedPixel {
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
 
-fn ray_color(
-    r: &Ray,
-    background: Color,
-    world: &HittableList,
-    lights: Arc<dyn Hittable>,
-    depth: i32,
-) -> Color {
-    if depth <= 0 {
-        return Color::broadcast(C_ZERO);
-    }
+// fn ray_color(
+//     r: &Ray,
+//     background: Color,
+//     world: &HittableList,
+//     lights: Arc<dyn Hittable>,
+//     depth: i32,
+// ) -> Color {
+//     if depth <= 0 {
+//         return Color::broadcast(C_ZERO);
+//     }
 
-    if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
-        let emitted = rec.mtl.emitted(r, &rec, rec.u, rec.v, rec.p);
-        if let Some(scatter) = rec.mtl.scatter(r, &rec) {
-            return match scatter {
-                ScatterRecord::SpecularRec { ray, attenuation } => {
-                    attenuation * ray_color(&ray, background, world, lights, depth - 1)
-                }
-                ScatterRecord::PdfRec { pdf, attenuation } => {
-                    let light_pdf = HittablePdf {
-                        obj: lights.clone(),
-                        origin: rec.p,
-                    };
+//     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
+//         let emitted = rec.mtl.emitted(r, &rec, rec.u, rec.v, rec.p);
+//         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
+//             return match scatter {
+//                 ScatterRecord::SpecularRec { ray, attenuation } => {
+//                     attenuation * ray_color(&ray, background, world, lights, depth - 1)
+//                 }
+//                 ScatterRecord::PdfRec { pdf, attenuation } => {
+//                     let light_pdf = HittablePdf {
+//                         obj: lights.clone(),
+//                         origin: rec.p,
+//                     };
 
-                    let mixed_pdf = MixturePdf::new(Arc::new(light_pdf), pdf);
-                    let scattered_ray = Ray::new(rec.p, mixed_pdf.generate(), r.time);
-                    let pdf_val = mixed_pdf.value(scattered_ray.direction);
-                    let pdf_val = if pdf_val.abs() < 1.0E-5 {
-                        if pdf_val.is_sign_positive() {
-                            1.0E-4
-                        } else {
-                            -1.0E-4
-                        }
-                    } else {
-                        pdf_val
-                    };
+//                     let mixed_pdf = MixturePdf::new(Arc::new(light_pdf), pdf);
+//                     let scattered_ray = Ray::new(rec.p, mixed_pdf.generate(), r.time);
+//                     let pdf_val = mixed_pdf.value(scattered_ray.direction);
+//                     let pdf_val = if pdf_val.abs() < 1.0E-5 {
+//                         if pdf_val.is_sign_positive() {
+//                             1.0E-4
+//                         } else {
+//                             -1.0E-4
+//                         }
+//                     } else {
+//                         pdf_val
+//                     };
 
-                    emitted
-                        + attenuation
-                            * rec.mtl.scattering_pdf(r, &rec, &scattered_ray)
-                            * ray_color(&scattered_ray, background, world, lights, depth - 1)
-                            / pdf_val
-                }
-            };
-        } else {
-            return emitted;
-        }
-    } else {
-        return background;
-    }
-}
+//                     emitted
+//                         + attenuation
+//                             * rec.mtl.scattering_pdf(r, &rec, &scattered_ray)
+//                             * ray_color(&scattered_ray, background, world, lights, depth - 1)
+//                             / pdf_val
+//                 }
+//             };
+//         } else {
+//             return emitted;
+//         }
+//     } else {
+//         return background;
+//     }
+// }
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
 enum Scene {
@@ -1114,22 +1112,22 @@ struct RaytracerUserConfig {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct RaytracerParams {
-    workers: i32,
-    worker_block_pixels: i32,
-    image_width: i32,
-    image_height: i32,
-    aspect_ratio: Real,
-    samples_per_pixel: i32,
-    max_ray_depth: i32,
-    vertical_fov: Real,
-    look_from: [Real; 3],
-    look_at: [Real; 3],
-    world_up: [Real; 3],
-    aperture: Real,
-    focus_dist: Real,
-    shuffle_workblocks: bool,
-    background: [Real; 3],
+pub struct RaytracerParams {
+    pub workers: i32,
+    pub worker_block_pixels: i32,
+    pub image_width: i32,
+    pub image_height: i32,
+    pub aspect_ratio: Real,
+    pub samples_per_pixel: i32,
+    pub max_ray_depth: i32,
+    pub vertical_fov: Real,
+    pub look_from: [Real; 3],
+    pub look_at: [Real; 3],
+    pub world_up: [Real; 3],
+    pub aperture: Real,
+    pub focus_dist: Real,
+    pub shuffle_workblocks: bool,
+    pub background: [Real; 3],
 }
 
 impl std::convert::From<RaytracerUserConfig> for RaytracerParams {
@@ -1309,26 +1307,9 @@ impl RaytracerState {
                                 (this_work_pkg.xdim.0..this_work_pkg.xdim.1).for_each(|x| {
                                     //
                                     // Raytrace this pixel
-                                    let pixel_color = (0..params.samples_per_pixel).fold(
-                                        Color::broadcast(0 as Real),
-                                        |color, _| {
-                                            let off = s.sample_unit_square();
-                                            let u = (x as Real + off.x)
-                                                / (params.image_width - 1) as Real;
-                                            let v = 1 as Real
-                                                - (y as Real + off.y)
-                                                    / (params.image_height - 1) as Real;
-                                            let r = cam.get_ray_ortho(u, v, &mut s);
-                                            color
-                                                + ray_color(
-                                                    &r,
-                                                    params.background.into(),
-                                                    &world,
-                                                    light.clone(),
-                                                    params.max_ray_depth,
-                                                )
-                                        },
-                                    );
+
+                                    let pixel_color =
+                                        cam.raytrace_pixel(x, y, &params, &world, &light, &mut s);
 
                                     let gamma_correct = (params.samples_per_pixel as f32).recip();
 
