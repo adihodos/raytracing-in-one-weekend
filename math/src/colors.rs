@@ -66,6 +66,10 @@ impl<T> TColorRGBA<T>
 where
     T: Copy + Clone + std::fmt::Debug + Num + NumColorComponent,
 {
+    pub fn broadcast(v: T) -> Self {
+        Self::new(v, v, v)
+    }
+
     pub fn new(r: T, g: T, b: T) -> Self {
         Self::new_with_alpha(r, g, b, T::alpha_max())
     }

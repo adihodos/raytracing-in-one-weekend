@@ -38,7 +38,7 @@ pub type Vec3 = math::vec3::TVec3<Real>;
 pub type Vec4 = math::vec4::TVec4<Real>;
 pub type Ray = math::ray::TRay<Real>;
 pub type Point = Vec3;
-pub type Color = Vec3;
+pub type Color = math::colors::RGBAColorF32;
 pub type Mat4 = math::mat4::Mat4<Real>;
 
 pub fn degrees_to_radians(degrees: Real) -> Real {

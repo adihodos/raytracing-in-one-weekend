@@ -1,5 +1,5 @@
 (
-    active_scene: GeometricPrimitives,
+    active_scene: Blocks,
     default_params:(
         workers: 8,
         worker_block_pixels: 8,
@@ -126,6 +126,28 @@
                 psi_max: 120.0,
                 lambda_max: 120.0,
         ))),
+
+        (Blocks,
+           Some((
+                workers: 8,
+                worker_block_pixels: 8,
+                aspect_ratio: 1.333333,
+                image_width: 800,
+                samples_per_pixel: 256,
+                max_ray_depth: 50,
+                vertical_fov: 65.0,
+                look_from: (0.0, 1.0, 30.0),
+                look_at: (0.0, 0.0, 0.0),
+                world_up: (0.0, 1.0, 0.0),
+                aperture: 0.5,
+                focus_dist: 15.0,
+                shuffle_workblocks: true,
+                background: (0.0, 0.0, 0.0),
+                projection: Perspective,
+                psi_max: 120.0,
+                lambda_max: 120.0,
+        ))),
+
 
         (PerlinSpheres,
                 Some((

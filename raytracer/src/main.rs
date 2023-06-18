@@ -75,7 +75,7 @@ use crate::{
     objects::sphere::MovingSphere,
     paraboloid::Paraboloid,
     rectangles::{XZRect, YZRect},
-    transform::{RotateY, Translate},
+    transform::{RotateY, Transform, Translate},
     triangle_mesh::TriangleMesh,
 };
 
@@ -89,58 +89,6 @@ struct RaytracedPixel {
 const COLOR_CLAMP_MIN: Real = 0 as Real;
 const COLOR_CLAMP_MAX: Real = 0.999 as Real;
 
-// fn ray_color(
-//     r: &Ray,
-//     background: Color,
-//     world: &HittableList,
-//     lights: Arc<dyn Hittable>,
-//     depth: i32,
-// ) -> Color {
-//     if depth <= 0 {
-//         return Color::broadcast(C_ZERO);
-//     }
-
-//     if let Some(rec) = world.hit(r, 0.001 as Real, C_INFINITY) {
-//         let emitted = rec.mtl.emitted(r, &rec, rec.u, rec.v, rec.p);
-//         if let Some(scatter) = rec.mtl.scatter(r, &rec) {
-//             return match scatter {
-//                 ScatterRecord::SpecularRec { ray, attenuation } => {
-//                     attenuation * ray_color(&ray, background, world, lights, depth - 1)
-//                 }
-//                 ScatterRecord::PdfRec { pdf, attenuation } => {
-//                     let light_pdf = HittablePdf {
-//                         obj: lights.clone(),
-//                         origin: rec.p,
-//                     };
-
-//                     let mixed_pdf = MixturePdf::new(Arc::new(light_pdf), pdf);
-//                     let scattered_ray = Ray::new(rec.p, mixed_pdf.generate(), r.time);
-//                     let pdf_val = mixed_pdf.value(scattered_ray.direction);
-//                     let pdf_val = if pdf_val.abs() < 1.0E-5 {
-//                         if pdf_val.is_sign_positive() {
-//                             1.0E-4
-//                         } else {
-//                             -1.0E-4
-//                         }
-//                     } else {
-//                         pdf_val
-//                     };
-
-//                     emitted
-//                         + attenuation
-//                             * rec.mtl.scattering_pdf(r, &rec, &scattered_ray)
-//                             * ray_color(&scattered_ray, background, world, lights, depth - 1)
-//                             / pdf_val
-//                 }
-//             };
-//         } else {
-//             return emitted;
-//         }
-//     } else {
-//         return background;
-//     }
-// }
-
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
 enum Scene {
     RandomWorld,
@@ -152,11 +100,12 @@ enum Scene {
     Chapter2Final,
     MeshTest,
     GeometricPrimitives,
+    Blocks,
 }
 
 fn scene_random_world() -> (HittableList, HittableList) {
     let ground_material = Arc::new(Lambertian::from_texture(Arc::new(
-        CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32)),
+        CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32), 4f32),
     )));
     let mut world = HittableList::new();
 
@@ -251,7 +200,7 @@ fn scene_random_world() -> (HittableList, HittableList) {
 
 fn scene_two_spheres() -> (HittableList, HittableList) {
     let checker_mtl = Arc::new(Lambertian::from_texture(Arc::new(
-        CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32)),
+        CheckerTexture::from_colors((0.2f32, 0.3f32, 0.1f32), (0.9f32, 0.9f32, 0.9f32), 4f32),
     )));
 
     let mut world = HittableList::new();
@@ -536,8 +485,6 @@ fn scene_cornell_box() -> (HittableList, HittableList) {
     });
     world.add(light);
 
-    // let aluminium = Arc::new(Metal::new((0.8f32, 0.85f32, 0.88f32), 0f32));
-
     let box1 = Arc::new(Block::new(
         (0f32, 0f32, 0f32),
         (165f32, 330f32, 165f32),
@@ -549,18 +496,6 @@ fn scene_cornell_box() -> (HittableList, HittableList) {
         offset: (265f32, 0f32, 295f32).into(),
     });
     world.add(box1);
-
-    let box2 = Arc::new(Block::new(
-        (0f32, 0f32, 0f32),
-        (165f32, 165f32, 165f32),
-        colors[1].clone(),
-    ));
-    let box2 = Arc::new(RotateY::new(box2, -18f32));
-    let box2 = Arc::new(Translate {
-        obj: box2,
-        offset: (130f32, 0f32, 65f32).into(),
-    });
-    // world.add(box2);
 
     let glass = Arc::new(Dielectric::new(1.5f32));
     let glass_sphere = Arc::new(Sphere::new((190f32, 90f32, 190f32).into(), 90f32, glass));
@@ -835,7 +770,7 @@ fn scene_final_chapter2() -> (HittableList, HittableList) {
     ));
     world.add(Arc::new(ConstantMedium::from_colored_object(
         boundary.clone(),
-        Vec3::broadcast(1_f32),
+        Color::broadcast(1f32),
         0.0001_f32,
     )));
 
@@ -929,7 +864,6 @@ fn scene_geometric_primitives() -> (HittableList, HittableList) {
 
     let block = Arc::new(Block::unit_cube(block_mtl));
 
-    use crate::transform::Transform;
     use math::quat;
     use math::vec3;
 
@@ -1080,6 +1014,110 @@ fn scene_mesh() -> (HittableList, HittableList) {
 
     let teapot = Arc::new(TriangleMesh::from_file(&model_file, xf, teapot_mtl));
     world.add(teapot);
+
+    let mut lights = HittableList::new();
+    lights.add(Arc::new(XZRect {
+        x0: -1000f32,
+        x1: 1000f32,
+        z0: -1000f32,
+        z1: 1000f32,
+        k: 1000f32,
+        mtl: Arc::<DiffuseLight>::new((0f32, 0f32, 0f32).into()),
+    }));
+
+    (world, lights)
+}
+
+fn scene_blocks() -> (HittableList, HittableList) {
+    let mut world = HittableList::new();
+
+    //
+    // add floor
+    let floor_mtl = Arc::new(Lambertian::from_texture(Arc::new(ImageTexture::new(
+        "data/textures/uv_grids/ash_uvgrid01.jpg",
+    ))));
+
+    let floor = Arc::new(XZRect {
+        x0: -1000f32,
+        x1: 1000f32,
+        z0: -1000f32,
+        z1: 1000f32,
+        k: 0f32,
+        mtl: floor_mtl,
+    });
+
+    world.add(floor);
+
+    world.add(Arc::new(FlipFace {
+        obj: Arc::new(XZRect {
+            x0: -1000f32,
+            x1: 1000f32,
+            z0: -1000f32,
+            z1: 1000f32,
+            k: 1000f32,
+            mtl: Arc::new(DiffuseLight::from((1f32, 1f32, 1f32))),
+        }),
+    }));
+
+    use math::{mat4, quat, vec3};
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(20f32, vec3::consts::unit_y()));
+    let t = mat4::Mat4::translate((-7f32, 5f32, 10f32).into());
+    let s = mat4::Mat4::non_uniform_scale((5f32, 10f32, 5f32).into());
+    let xf = t * r * s;
+
+    use math::color_palette;
+
+    let yellow_checkers = Arc::new(Lambertian::from_texture(Arc::new(
+        CheckerTexture::from_colors(
+            color_palette::material_design::YELLOW,
+            color_palette::material_design::BLACK,
+            4f32,
+        ),
+    )));
+
+    let block0 = Arc::new(Transform::new(
+        xf,
+        Arc::new(Block::unit_cube(yellow_checkers)),
+    ));
+    world.add(block0);
+
+    let green_checkers = Arc::new(Lambertian::from_texture(Arc::new(
+        CheckerTexture::from_colors(
+            color_palette::material_design::GREEN,
+            color_palette::material_design::BLACK,
+            4f32,
+        ),
+    )));
+
+    let t = mat4::Mat4::translate((0f32, 5f32, 0f32).into());
+    let s = mat4::Mat4::non_uniform_scale((5f32, 10f32, 5f32).into());
+    let xf = t * s;
+
+    let block1 = Arc::new(Transform::new(
+        xf,
+        Arc::new(Block::unit_cube(green_checkers)),
+    ));
+    world.add(block1);
+
+    let orange_checkers = Arc::new(Lambertian::from_texture(Arc::new(
+        CheckerTexture::from_colors(
+            color_palette::material_design::RED,
+            color_palette::material_design::BLACK,
+            4f32,
+        ),
+    )));
+
+    let r = quat::to_rotation_matrix(quat::Quat::axis_angle(-20f32, vec3::consts::unit_y()));
+    let t = mat4::Mat4::translate((7f32, 5f32, 10f32).into());
+    let s = mat4::Mat4::non_uniform_scale((5f32, 10f32, 5f32).into());
+    let xf = t * r * s;
+
+    let block2 = Arc::new(Transform::new(
+        xf,
+        Arc::new(Block::unit_cube(orange_checkers)),
+    ));
+    world.add(block2);
 
     let mut lights = HittableList::new();
     lights.add(Arc::new(XZRect {
@@ -1269,6 +1307,7 @@ impl RaytracerState {
             Scene::TwoSpheres => scene_two_spheres(),
             Scene::GeometricPrimitives => scene_geometric_primitives(),
             Scene::MeshTest => scene_mesh(),
+            Scene::Blocks => scene_blocks(),
             _ => todo!("Unimplemented"),
         };
 
@@ -1329,22 +1368,23 @@ impl RaytracerState {
 
                                     let check_invalid_pixel = |x: Real| !x.is_normal();
 
-                                    let pixel_color = Vec3 {
-                                        x: if check_invalid_pixel(pixel_color.x) {
+                                    let pixel_color = Color {
+                                        r: if check_invalid_pixel(pixel_color.r) {
                                             0 as Real
                                         } else {
-                                            gamma_correct_fn(pixel_color.x)
+                                            gamma_correct_fn(pixel_color.r)
                                         },
-                                        y: if check_invalid_pixel(pixel_color.y) {
+                                        g: if check_invalid_pixel(pixel_color.g) {
                                             0 as Real
                                         } else {
-                                            gamma_correct_fn(pixel_color.y)
+                                            gamma_correct_fn(pixel_color.g)
                                         },
-                                        z: if check_invalid_pixel(pixel_color.z) {
+                                        b: if check_invalid_pixel(pixel_color.b) {
                                             0 as Real
                                         } else {
-                                            gamma_correct_fn(pixel_color.z)
+                                            gamma_correct_fn(pixel_color.b)
                                         },
+                                        ..pixel_color
                                     };
 
                                     tx.send(RaytracedPixel {
@@ -1735,34 +1775,11 @@ impl RaytracingGlState {
         let texture = rendering::UniqueTexture::new(unsafe {
             let mut texture = 0u32;
             gl::CreateTextures(gl::TEXTURE_2D, 1, &mut texture as *mut _);
-            gl::TextureStorage2D(texture, 1, gl::RGB32F, img_width as i32, img_height as i32);
+            gl::TextureStorage2D(texture, 1, gl::RGBA32F, img_width as i32, img_height as i32);
 
             texture
         })
         .expect("Failed to create texture");
-
-        let mut text_pixels = vec![0f32; (img_width * img_height * 3) as usize];
-        for y in 0..img_height {
-            for x in 0..img_width {
-                text_pixels[(y * img_width * 3 + x * 3 + 0) as usize] = x as f32 / img_width as f32;
-                text_pixels[(y * img_width * 3 + x * 3 + 1) as usize] =
-                    y as f32 / img_height as f32;
-            }
-        }
-
-        unsafe {
-            gl::TextureSubImage2D(
-                *texture,
-                0,
-                0,
-                0,
-                img_width as i32,
-                img_height as i32,
-                gl::RGB,
-                gl::FLOAT,
-                text_pixels.as_ptr() as *const _ as *const c_void,
-            );
-        }
 
         let sampler = rendering::UniqueSampler::new(unsafe {
             let mut sampler = 0u32;
@@ -1799,7 +1816,7 @@ impl RaytracingGlState {
                 0,
                 self.img_width,
                 self.img_height,
-                gl::RGB,
+                gl::RGBA,
                 gl::FLOAT,
                 pixels.as_ptr() as *const c_void,
             );

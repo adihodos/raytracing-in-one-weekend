@@ -1,4 +1,3 @@
-use rand::Rng;
 use std::sync::Arc;
 
 use crate::{
@@ -92,7 +91,7 @@ impl Camera {
         Ray::new(
             self.origin + offset,
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
-            rand::thread_rng().gen_range(self.time0, self.time1),
+            random_real(),
         )
     }
 
@@ -108,7 +107,7 @@ impl Camera {
         Ray {
             origin: self.lower_left_corner + s * self.horizontal + t * self.vertical + offset,
             direction: -self.w,
-            time: crate::types::random_real_range(self.time0, self.time1),
+            time: random_real(),
         }
     }
 
@@ -193,65 +192,62 @@ impl Camera {
         lights: &Arc<HittableList>,
         s: &mut SamplerBase<S>,
     ) -> Color {
-        (0..params.samples_per_pixel).fold(
-            Color::broadcast(0 as Real),
-            |color, _| -> math::vec3::TVec3<f32> {
-                let off = s.sample_unit_square();
-                let u = (x as Real + off.x) / (params.image_width - 1) as Real;
-                let v = 1 as Real - (y as Real + off.y) / (params.image_height - 1) as Real;
+        (0..params.samples_per_pixel).fold(Color::broadcast(0 as Real), |color, _| -> Color {
+            let off = s.sample_unit_square();
+            let u = (x as Real + off.x) / (params.image_width - 1) as Real;
+            let v = 1 as Real - (y as Real + off.y) / (params.image_height - 1) as Real;
 
-                match params.projection {
-                    Projection::Perspective => {
-                        let r = self.get_ray_perspective(u, v, s);
+            match params.projection {
+                Projection::Perspective => {
+                    let r = self.get_ray_perspective(u, v, s);
+                    color
+                        + Self::ray_color(
+                            &r,
+                            params.background.into(),
+                            &world,
+                            lights.clone(),
+                            params.max_ray_depth,
+                        )
+                }
+                Projection::Orthographic => {
+                    let r = self.get_ray_ortho(u, v, s);
+                    color
+                        + Self::ray_color(
+                            &r,
+                            params.background.into(),
+                            &world,
+                            lights.clone(),
+                            params.max_ray_depth,
+                        )
+                }
+                Projection::FishEye => {
+                    if let Some(ray) = self.get_ray_fisheye(params, u, v, s) {
                         color
                             + Self::ray_color(
-                                &r,
+                                &ray,
                                 params.background.into(),
                                 &world,
                                 lights.clone(),
                                 params.max_ray_depth,
                             )
-                    }
-                    Projection::Orthographic => {
-                        let r = self.get_ray_ortho(u, v, s);
+                    } else {
                         color
-                            + Self::ray_color(
-                                &r,
-                                params.background.into(),
-                                &world,
-                                lights.clone(),
-                                params.max_ray_depth,
-                            )
-                    }
-                    Projection::FishEye => {
-                        if let Some(ray) = self.get_ray_fisheye(params, u, v, s) {
-                            color
-                                + Self::ray_color(
-                                    &ray,
-                                    params.background.into(),
-                                    &world,
-                                    lights.clone(),
-                                    params.max_ray_depth,
-                                )
-                        } else {
-                            color
-                        }
-                    }
-
-                    Projection::SphericalPanoramic => {
-                        let r = self.get_ray_spherical_panoramic(params, u, v, s);
-                        color
-                            + Self::ray_color(
-                                &r,
-                                params.background.into(),
-                                &world,
-                                lights.clone(),
-                                params.max_ray_depth,
-                            )
                     }
                 }
-            },
-        )
+
+                Projection::SphericalPanoramic => {
+                    let r = self.get_ray_spherical_panoramic(params, u, v, s);
+                    color
+                        + Self::ray_color(
+                            &r,
+                            params.background.into(),
+                            &world,
+                            lights.clone(),
+                            params.max_ray_depth,
+                        )
+                }
+            }
+        })
     }
 
     fn ray_color(
