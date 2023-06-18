@@ -1,5 +1,5 @@
 (
-    active_scene: GeometricPrimitives,
+    active_scene: Chapter2Final,
     default_params:(
         workers: 8,
         worker_block_pixels: 8,
@@ -15,7 +15,10 @@
         focus_dist: 10.0,
         shuffle_workblocks: true,
         background: (0.0, 0.0, 0.0),
+        projection: Perspective,
+        psi_max: 120.0,
     ),
+
     defined_scenes: [
         (CornellBox, None),
         (RandomWorld,
@@ -34,24 +37,28 @@
                 focus_dist: 10.0,
                 shuffle_workblocks: true,
                 background: (0.5, 0.8, 0.99),
+                projection: Perspective,
+                psi_max: 120.0,
         ))),
 
         (Chapter2Final,
             Some((
-                workers: 16,
+                workers: 8,
                 worker_block_pixels: 8,
                 aspect_ratio: 1.0,
                 image_width: 800,
-                samples_per_pixel: 8192,
+                samples_per_pixel: 10000,
                 max_ray_depth: 50,
                 vertical_fov: 40.0,
                 look_from: (478.0, 278.0, -600.0),
                 look_at: (278.0, 278.0, 0.0),
                 world_up: (0.0, 1.0, 0.0),
                 aperture: 0.1,
-                focus_dist: 10.0,
+                focus_dist: 15.0,
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
+                projection: Perspective,
+                psi_max: 180.0,
         ))),
 
         (SimpleLight,
@@ -70,6 +77,8 @@
                 focus_dist: 10.0,
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
+                projection: Perspective,
+                psi_max: 120.0,
         ))),
 
         (GeometricPrimitives,
@@ -81,13 +90,15 @@
                 samples_per_pixel: 256,
                 max_ray_depth: 50,
                 vertical_fov: 75.0,
-                look_from: (0.0, 25.0, 250.0),
+                look_from: (0.0, 25.0, 120.0),
                 look_at: (0.0, 0.0, 0.0),
                 world_up: (0.0, 1.0, 0.0),
                 aperture: 0.0,
-                focus_dist: 65.0,
+                focus_dist: 15.0,
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
+                projection: FishEye,
+                psi_max: 180.0,
         ))),
 
         (MeshTest,
@@ -106,6 +117,8 @@
                 focus_dist: 10.0,
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
+                projection: Perspective,
+                psi_max: 120.0,
         ))),
 
         (PerlinSpheres,
@@ -124,6 +137,8 @@
                         focus_dist: 10.0,
                         shuffle_workblocks: true,
                         background: (0.0, 0.0, 0.0),
+                        projection: Perspective,
+                        psi_max: 120.0,
                 ))),
 
         (TwoSpheres,
@@ -142,6 +157,8 @@
                 focus_dist: 10.0,
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
+                projection: Perspective,
+                psi_max: 120.0,
                 ))
         ),
     ],

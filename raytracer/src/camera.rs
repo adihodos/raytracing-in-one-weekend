@@ -7,9 +7,16 @@ use crate::{
     material::ScatterRecord,
     pdf::{HittablePdf, MixturePdf, Pdf},
     sampling::{SampleStrategy, SamplerBase},
-    types::{Color, Point, Ray, Real, Vec3, C_INFINITY, C_ZERO},
+    types::{random_real, Color, Point, Ray, Real, Vec2, Vec3, C_INFINITY, C_ONE, C_TWO, C_ZERO},
     RaytracerParams,
 };
+
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum Projection {
+    Perspective,
+    Orthographic,
+    FishEye,
+}
 
 #[derive(Copy, Clone)]
 pub struct Camera {
@@ -101,6 +108,42 @@ impl Camera {
         }
     }
 
+    fn get_ray_fisheye<S: SampleStrategy>(
+        &self,
+        params: &RaytracerParams,
+        x: Real,
+        y: Real,
+        _smp: &mut SamplerBase<S>,
+    ) -> Option<Ray> {
+        //
+        // transform sampled point to [-1, +1]x[-1, +1]
+        let pn = Vec2 {
+            x: C_TWO * x - C_ONE,
+            y: C_TWO * y - C_ONE,
+        };
+
+        let rsqr = pn.x * pn.x + pn.y * pn.y;
+
+        if rsqr <= C_ONE {
+            let r = rsqr.sqrt();
+            let psi = r * params.psi_max;
+            let (sin_psi, cos_psi) = psi.sin_cos();
+            let Vec2 {
+                x: cos_alpha,
+                y: sin_alpha,
+            } = pn / r;
+
+            Some(Ray {
+                origin: self.origin,
+                direction: sin_psi * cos_alpha * self.u + sin_psi * sin_alpha * self.v
+                    - cos_psi * self.w,
+                time: random_real(),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn raytrace_pixel<S: SampleStrategy>(
         &self,
         x: i32,
@@ -110,20 +153,53 @@ impl Camera {
         lights: &Arc<HittableList>,
         s: &mut SamplerBase<S>,
     ) -> Color {
-        (0..params.samples_per_pixel).fold(Color::broadcast(0 as Real), |color, _| {
-            let off = s.sample_unit_square();
-            let u = (x as Real + off.x) / (params.image_width - 1) as Real;
-            let v = 1 as Real - (y as Real + off.y) / (params.image_height - 1) as Real;
-            let r = self.get_ray_perspective(u, v, s);
-            color
-                + Self::ray_color(
-                    &r,
-                    params.background.into(),
-                    &world,
-                    lights.clone(),
-                    params.max_ray_depth,
-                )
-        })
+        (0..params.samples_per_pixel).fold(
+            Color::broadcast(0 as Real),
+            |color, _| -> math::vec3::TVec3<f32> {
+                let off = s.sample_unit_square();
+                let u = (x as Real + off.x) / (params.image_width - 1) as Real;
+                let v = 1 as Real - (y as Real + off.y) / (params.image_height - 1) as Real;
+
+                match params.projection {
+                    Projection::Perspective => {
+                        let r = self.get_ray_perspective(u, v, s);
+                        color
+                            + Self::ray_color(
+                                &r,
+                                params.background.into(),
+                                &world,
+                                lights.clone(),
+                                params.max_ray_depth,
+                            )
+                    }
+                    Projection::Orthographic => {
+                        let r = self.get_ray_ortho(u, v, s);
+                        color
+                            + Self::ray_color(
+                                &r,
+                                params.background.into(),
+                                &world,
+                                lights.clone(),
+                                params.max_ray_depth,
+                            )
+                    }
+                    Projection::FishEye => {
+                        if let Some(ray) = self.get_ray_fisheye(params, u, v, s) {
+                            color
+                                + Self::ray_color(
+                                    &ray,
+                                    params.background.into(),
+                                    &world,
+                                    lights.clone(),
+                                    params.max_ray_depth,
+                                )
+                        } else {
+                            color
+                        }
+                    }
+                }
+            },
+        )
     }
 
     fn ray_color(

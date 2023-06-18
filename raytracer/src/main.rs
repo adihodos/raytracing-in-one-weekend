@@ -6,6 +6,7 @@ use std::{
     sync::{mpsc::Receiver, Arc},
 };
 
+use camera::Projection;
 use checker_texture::CheckerTexture;
 use diffuse_light::DiffuseLight;
 
@@ -1109,6 +1110,8 @@ struct RaytracerUserConfig {
     focus_dist: Real,
     shuffle_workblocks: bool,
     background: [Real; 3],
+    projection: Projection,
+    psi_max: f32,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1128,6 +1131,8 @@ pub struct RaytracerParams {
     pub focus_dist: Real,
     pub shuffle_workblocks: bool,
     pub background: [Real; 3],
+    pub projection: Projection,
+    pub psi_max: f32,
 }
 
 impl std::convert::From<RaytracerUserConfig> for RaytracerParams {
@@ -1150,6 +1155,8 @@ impl std::convert::From<RaytracerUserConfig> for RaytracerParams {
             focus_dist: c.focus_dist,
             shuffle_workblocks: c.shuffle_workblocks,
             background: c.background,
+            projection: c.projection,
+            psi_max: c.psi_max.to_radians(),
         }
     }
 }
