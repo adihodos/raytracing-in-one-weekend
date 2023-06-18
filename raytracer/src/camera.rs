@@ -7,7 +7,10 @@ use crate::{
     material::ScatterRecord,
     pdf::{HittablePdf, MixturePdf, Pdf},
     sampling::{SampleStrategy, SamplerBase},
-    types::{random_real, Color, Point, Ray, Real, Vec2, Vec3, C_INFINITY, C_ONE, C_TWO, C_ZERO},
+    types::{
+        random_real, Color, Point, Ray, Real, Vec2, Vec3, C_HALF_ONE, C_INFINITY, C_ONE, C_PI,
+        C_TWO, C_ZERO,
+    },
     RaytracerParams,
 };
 
@@ -16,6 +19,7 @@ pub enum Projection {
     Perspective,
     Orthographic,
     FishEye,
+    SphericalPanoramic,
 }
 
 #[derive(Copy, Clone)]
@@ -144,6 +148,42 @@ impl Camera {
         }
     }
 
+    fn get_ray_spherical_panoramic<S: SampleStrategy>(
+        &self,
+        params: &RaytracerParams,
+        x: Real,
+        y: Real,
+        _smp: &mut SamplerBase<S>,
+    ) -> Ray {
+        //
+        // transform sampled point to [-1, +1]x[-1, +1]
+        let pn = Vec2 {
+            x: C_TWO * x - C_ONE,
+            y: C_TWO * y - C_ONE,
+        };
+
+        //
+        // compute lambda and psi angles
+        let lambda = pn.x * params.lambda_max;
+        let psi = pn.y * params.psi_max;
+
+        //
+        // compute spherical azimuth and polar angles
+        let phi = C_PI - lambda;
+        let theta = C_HALF_ONE * C_PI - psi;
+
+        let (sin_theta, cos_theta) = theta.sin_cos();
+        let (sin_phi, cos_phi) = phi.sin_cos();
+
+        Ray {
+            origin: self.origin,
+            direction: sin_theta * sin_phi * self.u
+                + cos_theta * self.v
+                + sin_theta * cos_phi * self.w,
+            time: random_real(),
+        }
+    }
+
     pub fn raytrace_pixel<S: SampleStrategy>(
         &self,
         x: i32,
@@ -196,6 +236,18 @@ impl Camera {
                         } else {
                             color
                         }
+                    }
+
+                    Projection::SphericalPanoramic => {
+                        let r = self.get_ray_spherical_panoramic(params, u, v, s);
+                        color
+                            + Self::ray_color(
+                                &r,
+                                params.background.into(),
+                                &world,
+                                lights.clone(),
+                                params.max_ray_depth,
+                            )
                     }
                 }
             },

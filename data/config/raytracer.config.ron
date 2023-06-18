@@ -1,5 +1,5 @@
 (
-    active_scene: Chapter2Final,
+    active_scene: GeometricPrimitives,
     default_params:(
         workers: 8,
         worker_block_pixels: 8,
@@ -16,7 +16,8 @@
         shuffle_workblocks: true,
         background: (0.0, 0.0, 0.0),
         projection: Perspective,
-        psi_max: 120.0,
+        psi_max: 180.0,
+        lambda_max: 120.0,
     ),
 
     defined_scenes: [
@@ -39,6 +40,7 @@
                 background: (0.5, 0.8, 0.99),
                 projection: Perspective,
                 psi_max: 120.0,
+                lambda_max: 120.0,
         ))),
 
         (Chapter2Final,
@@ -59,6 +61,7 @@
                 background: (0.0, 0.0, 0.0),
                 projection: Perspective,
                 psi_max: 180.0,
+                lambda_max: 120.0,
         ))),
 
         (SimpleLight,
@@ -79,6 +82,7 @@
                 background: (0.0, 0.0, 0.0),
                 projection: Perspective,
                 psi_max: 120.0,
+                lambda_max: 120.0,
         ))),
 
         (GeometricPrimitives,
@@ -97,8 +101,9 @@
                 focus_dist: 15.0,
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
-                projection: FishEye,
-                psi_max: 180.0,
+                projection: SphericalPanoramic,
+                psi_max: 360.0,
+                lambda_max: 180.0,
         ))),
 
         (MeshTest,
@@ -119,6 +124,7 @@
                 background: (0.0, 0.0, 0.0),
                 projection: Perspective,
                 psi_max: 120.0,
+                lambda_max: 120.0,
         ))),
 
         (PerlinSpheres,
@@ -139,6 +145,7 @@
                         background: (0.0, 0.0, 0.0),
                         projection: Perspective,
                         psi_max: 120.0,
+                        lambda_max: 120.0,
                 ))),
 
         (TwoSpheres,
@@ -159,6 +166,7 @@
                 background: (0.0, 0.0, 0.0),
                 projection: Perspective,
                 psi_max: 120.0,
+                lambda_max: 120.0,
                 ))
         ),
     ],

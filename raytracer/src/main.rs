@@ -1112,6 +1112,7 @@ struct RaytracerUserConfig {
     background: [Real; 3],
     projection: Projection,
     psi_max: f32,
+    lambda_max: f32,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1133,6 +1134,7 @@ pub struct RaytracerParams {
     pub background: [Real; 3],
     pub projection: Projection,
     pub psi_max: f32,
+    pub lambda_max: f32,
 }
 
 impl std::convert::From<RaytracerUserConfig> for RaytracerParams {
@@ -1157,6 +1159,7 @@ impl std::convert::From<RaytracerUserConfig> for RaytracerParams {
             background: c.background,
             projection: c.projection,
             psi_max: c.psi_max.to_radians(),
+            lambda_max: c.lambda_max.to_radians(),
         }
     }
 }
