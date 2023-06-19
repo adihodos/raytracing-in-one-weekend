@@ -144,7 +144,7 @@
                 shuffle_workblocks: true,
                 background: (0.0, 0.0, 0.0),
                 projection: Perspective,
-                psi_max: 120.0,
+                psi_max: 180.0,
                 lambda_max: 120.0,
         ))),
 

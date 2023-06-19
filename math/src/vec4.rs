@@ -47,10 +47,218 @@ where
         self.square_len().sqrt()
     }
 
+    pub fn xxx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.x,
+            z: self.x,
+        }
+    }
+
+    pub fn xxy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.x,
+            z: self.y,
+        }
+    }
+
+    pub fn xxz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.x,
+            z: self.z,
+        }
+    }
+
+    pub fn xyx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.y,
+            z: self.x,
+        }
+    }
+
+    pub fn xyy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.y,
+            z: self.y,
+        }
+    }
+
     pub fn xyz(&self) -> TVec3<T> {
         TVec3 {
             x: self.x,
             y: self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn xzx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.z,
+            z: self.x,
+        }
+    }
+
+    pub fn xzy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.z,
+            z: self.y,
+        }
+    }
+
+    pub fn xzz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.x,
+            y: self.z,
+            z: self.z,
+        }
+    }
+
+    pub fn yxx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.x,
+            z: self.x,
+        }
+    }
+
+    pub fn yxy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.x,
+            z: self.y,
+        }
+    }
+
+    pub fn yxz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.x,
+            z: self.z,
+        }
+    }
+
+    pub fn yyx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.y,
+            z: self.x,
+        }
+    }
+
+    pub fn yyy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.y,
+            z: self.y,
+        }
+    }
+
+    pub fn yyz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn yzx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.z,
+            z: self.x,
+        }
+    }
+
+    pub fn yzy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.z,
+            z: self.y,
+        }
+    }
+
+    pub fn yzz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.y,
+            y: self.z,
+            z: self.z,
+        }
+    }
+
+    pub fn zxx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.x,
+            z: self.x,
+        }
+    }
+
+    pub fn zxy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.x,
+            z: self.y,
+        }
+    }
+
+    pub fn zxz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.x,
+            z: self.z,
+        }
+    }
+
+    pub fn zyx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.y,
+            z: self.x,
+        }
+    }
+
+    pub fn zyy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.y,
+            z: self.y,
+        }
+    }
+
+    pub fn zyz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn zzx(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.z,
+            z: self.x,
+        }
+    }
+
+    pub fn zzy(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.z,
+            z: self.y,
+        }
+    }
+
+    pub fn zzz(&self) -> TVec3<T> {
+        TVec3 {
+            x: self.z,
+            y: self.z,
             z: self.z,
         }
     }

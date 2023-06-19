@@ -4,11 +4,10 @@ use math::vec3::{dot, normalize};
 
 use crate::hittable::HitRecord;
 use crate::material::{Material, ScatterRecord};
-use crate::onb::Onb;
 use crate::pdf::CosinePdf;
 use crate::solid_color_texture::SolidColorTexture;
 use crate::texture::Texture;
-use crate::types::{random_cosine_direction, Color, Ray, Real};
+use crate::types::{Color, Ray, Real};
 
 #[derive(Clone)]
 pub struct Lambertian {

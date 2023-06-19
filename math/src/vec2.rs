@@ -49,6 +49,34 @@ where
     {
         self.square_len().sqrt()
     }
+
+    pub fn xx(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.x,
+        }
+    }
+
+    pub fn xy(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.y,
+        }
+    }
+
+    pub fn yx(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.x,
+        }
+    }
+
+    pub fn yy(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.y,
+        }
+    }
 }
 
 /// Frequently used constant vectors

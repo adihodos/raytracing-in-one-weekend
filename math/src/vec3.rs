@@ -68,6 +68,222 @@ where
     pub fn as_mut_ptr(&mut self) -> *mut T {
         &mut self.x as *mut _
     }
+
+    pub fn xxx(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.x,
+            z: self.x,
+        }
+    }
+
+    pub fn xxy(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.x,
+            z: self.y,
+        }
+    }
+
+    pub fn xxz(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.x,
+            z: self.z,
+        }
+    }
+
+    pub fn xyx(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.y,
+            z: self.x,
+        }
+    }
+
+    pub fn xyy(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.y,
+            z: self.y,
+        }
+    }
+
+    pub fn xyz(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn xzx(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.z,
+            z: self.x,
+        }
+    }
+
+    pub fn xzy(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.z,
+            z: self.y,
+        }
+    }
+
+    pub fn xzz(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.z,
+            z: self.z,
+        }
+    }
+
+    pub fn yxx(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.x,
+            z: self.x,
+        }
+    }
+
+    pub fn yxy(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.x,
+            z: self.y,
+        }
+    }
+
+    pub fn yxz(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.x,
+            z: self.z,
+        }
+    }
+
+    pub fn yyx(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.y,
+            z: self.x,
+        }
+    }
+
+    pub fn yyy(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.y,
+            z: self.y,
+        }
+    }
+
+    pub fn yyz(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn yzx(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.z,
+            z: self.x,
+        }
+    }
+
+    pub fn yzy(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.z,
+            z: self.y,
+        }
+    }
+
+    pub fn yzz(&self) -> Self {
+        Self {
+            x: self.y,
+            y: self.z,
+            z: self.z,
+        }
+    }
+
+    pub fn zxx(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.x,
+            z: self.x,
+        }
+    }
+
+    pub fn zxy(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.x,
+            z: self.y,
+        }
+    }
+
+    pub fn zxz(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.x,
+            z: self.z,
+        }
+    }
+
+    pub fn zyx(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.y,
+            z: self.x,
+        }
+    }
+
+    pub fn zyy(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.y,
+            z: self.y,
+        }
+    }
+
+    pub fn zyz(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.y,
+            z: self.z,
+        }
+    }
+
+    pub fn zzx(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.z,
+            z: self.x,
+        }
+    }
+
+    pub fn zzy(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.z,
+            z: self.y,
+        }
+    }
+
+    pub fn zzz(&self) -> Self {
+        Self {
+            x: self.z,
+            y: self.z,
+            z: self.z,
+        }
+    }
 }
 
 pub mod consts {
